@@ -118,7 +118,7 @@ const int HISTORY_POINTS = 30;
 const int MAX_ACTIVE_CRYPTO_COUNT = 10;
 const int CRYPTO_VISIBLE_ROWS = 4;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
-const unsigned long CRYPTO_HISTORY_STEP_INTERVAL_MS = 750UL;
+const unsigned long CRYPTO_HISTORY_STEP_INTERVAL_MS = 3000UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
 bool cryptoHistoryOk[MAX_ACTIVE_CRYPTO_COUNT];
 float currentCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
@@ -944,10 +944,10 @@ void handleTickerEditorSave() {
 
   loadCryptoConfigurationFromSD();
   set_status("Tickers saved");
-  updateCrypto();
-  updateHistorySparklines();
-  refreshAll();
-  sendTickerEditorPage("Saved. The display reloaded the ticker list from the SD card.", true);
+  renderCryptoWindow();
+  cryptoRefreshPending = true;
+  startCryptoHistoryRefresh();
+  sendTickerEditorPage("Saved. The ticker list reloaded. Prices and history will refresh in the background.", true);
 }
 
 void sendSecretsEditorPage(const char *message, bool success) {
@@ -1301,7 +1301,7 @@ void sendInfoPage() {
 
   String body = editorChromeStart("Project Info", "Repository, license, notice, and contribution guidance for WeatherCrypto.");
   body += "<div class=\"section\"><h2>Attribution</h2>";
-  body += "<p>WeatherCrypto is created and licensed by <strong>Paul Hodara</strong>.</p>";
+  body += "<p>WeatherCrypto is created (with a little help from AI) and licensed by <strong>Paul Hodara</strong>.</p>";
   body += "<p>Copyright 2026 Paul Hodara</p></div>";
 
   body += "<div class=\"section\"><h2>Repository</h2>";
@@ -1676,7 +1676,7 @@ bool fetchHistory30(const char* coinId, float outVals[], int &outCount) {
 
   http.begin(url);
   int code = http.GET();
-  if (code <= 0) {
+  if (code != 200) {
     Serial.printf("CG history: %s HTTP %d\n", coinId, code);
     http.end();
     return false;
@@ -1941,7 +1941,7 @@ void showPage(int page) {
     renderCryptoWindow();
     set_status("Updating...");
     cryptoRefreshPending = true;
-    if (!allCryptoHistoryReady()) startCryptoHistoryRefresh();
+    if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
     else cryptoHistoryRefreshPending = false;
     cryptoSparklinesDirty = true;
   }
@@ -2741,8 +2741,7 @@ void setup() {
     refreshAll();
     fetchForecast4();
     updateForecastLabels();
-    Serial.println("History: startup refresh");
-    updateHistorySparklines();
+    startCryptoHistoryRefresh();
 
     lastWeatherRefresh = millis();
   }
@@ -2771,7 +2770,7 @@ void loop() {
     set_status("Updated");
     lastCryptoPriceRefresh = millis();
     cryptoRefreshPending = false;
-    if (!allCryptoHistoryReady()) startCryptoHistoryRefresh();
+    if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
   }
 
   if (currentPage == 1 && cryptoHistoryRefreshPending) {
