@@ -3,7 +3,7 @@
 Thanks for your interest in improving CloudAndCoin.
 
 ## Before You Contribute
-- Please read the [`LICENSE`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/LICENSE:1) first.
+- Please read the [`LICENSE`](LICENSE) first.
 - This project is available under `PolyForm Noncommercial 1.0.0`.
 - By submitting a contribution, you agree that your contribution may be included in this repository and distributed under the same license terms.
 

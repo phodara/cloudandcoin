@@ -20,8 +20,8 @@ Place these files in the root of the SD card:
 
 You can start from:
 
-- [`sdcard/secrets.example.txt`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/sdcard/secrets.example.txt:1)
-- [`sdcard/crypto_tickers.txt`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/sdcard/crypto_tickers.txt:1)
+- [`sdcard/secrets.example.txt`](../sdcard/secrets.example.txt)
+- [`sdcard/crypto_tickers.txt`](../sdcard/crypto_tickers.txt)
 
 ## secrets.txt Format
 
