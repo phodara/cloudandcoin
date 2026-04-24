@@ -10,7 +10,7 @@
 - Current crypto prices from CoinGecko
 - Local web editor for settings and ticker management
 - SD-card-based runtime configuration
-- Wi-Fi setup fallback through a temporary setup network
+- Temporary remote configuration network for first-time Wi-Fi setup and recovery
 
 ## Weather Screen
 
