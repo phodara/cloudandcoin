@@ -1,11 +1,8 @@
-<<<<<<< HEAD
-# cloudandcoin
-=======
 # CloudAndCoin
 
 ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls live weather and crypto data from Home Assistant, fetches a 4-day forecast from OpenWeather, and renders 30-day sparkline history for supported coins.
 
-For the current SD-card setup flow, see [`docs/quick-install.md`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/docs/quick-install.md:1).
+For the current SD-card setup flow, see [`docs/quick-install.md`](docs/quick-install.md).
 
 ## What It Does
 - Shows the current weather, condition, high, low, and pressure
@@ -33,7 +30,7 @@ This project is currently built and tested on:
 - Hosyond `3.5'' 320x480` Touch Screen ESP32 Display with WiFi+BT, ST7796U Driver LCD TFT Screen Module
 - Product link: <https://a.co/d/0cVFruZA>
 
-Display-related settings are defined in [`platformio.ini`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/platformio.ini:1), so you do not need to edit `TFT_eSPI` library files manually.
+Display-related settings are defined in [`platformio.ini`](platformio.ini), so you do not need to edit `TFT_eSPI` library files manually.
 
 ## Pin Configuration
 - `TFT_MISO`: 12
@@ -51,7 +48,7 @@ Display-related settings are defined in [`platformio.ini`](/Users/paulhodara/Doc
 - CoinGecko for 30-day BTC, ETH, and ADA price history
 
 ## Required Secrets
-Copy [`src/secrets.example.h`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/src/secrets.example.h:1) to `src/secrets.h` and fill in:
+Copy [`src/secrets.example.h`](src/secrets.example.h) to `src/secrets.h` and fill in:
 
 - `SECRET_SSID`
 - `SECRET_WIFI_PASS`
@@ -61,7 +58,7 @@ Copy [`src/secrets.example.h`](/Users/paulhodara/Documents/PlatformIO/cloudandco
 `src/secrets.h` is intentionally ignored by git so credentials do not get pushed to GitHub.
 
 ## Home Assistant Entities
-The current code expects these entity IDs in [`src/main.cpp`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/src/main.cpp:27):
+The current code expects these entity IDs in [`src/main.cpp`](src/main.cpp):
 
 - `weather.openweathermap`
 - `sensor.bitcoin_usd`
@@ -95,7 +92,7 @@ Currently supported tickers:
 - `ADA`
 
 Example file:
-- [`sdcard/crypto_tickers.txt`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/sdcard/crypto_tickers.txt:1)
+- [`sdcard/crypto_tickers.txt`](sdcard/crypto_tickers.txt)
 
 Example entries:
 
@@ -131,10 +128,10 @@ If the SD card is missing, the file is missing, or no supported tickers are foun
 - Monitor speed: `115200`
 
 ## Repository Layout
-- [`src/main.cpp`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/src/main.cpp:1): main application logic and UI
-- [`src/secrets.example.h`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/src/secrets.example.h:1): safe template for local credentials
-- [`include/lv_conf.h`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/include/lv_conf.h:1): LVGL configuration
-- [`platformio.ini`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/platformio.ini:1): board, libraries, and display flags
+- [`src/main.cpp`](src/main.cpp): main application logic and UI
+- [`src/secrets.example.h`](src/secrets.example.h): safe template for local credentials
+- [`include/lv_conf.h`](include/lv_conf.h): LVGL configuration
+- [`platformio.ini`](platformio.ini): board, libraries, and display flags
 
 ## Notes
 - The display is configured for landscape orientation with a 480x320 framebuffer.
@@ -142,8 +139,7 @@ If the SD card is missing, the file is missing, or no supported tickers are foun
 - Touch calibration values are currently hardcoded for this hardware setup.
 
 ## License
-This project is licensed under [`PolyForm Noncommercial 1.0.0`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/LICENSE:1).
+This project is licensed under [`PolyForm Noncommercial 1.0.0`](LICENSE).
 Commercial use is not permitted without separate permission from the licensor.
 Redistributors must keep the license terms or license URL and the included `Required Notice`.
-See [`NOTICE`](/Users/paulhodara/Documents/PlatformIO/cloudandcoin/NOTICE:1) for the repository notice that should stay with redistributed copies.
->>>>>>> 4a4265d (Update project files)
+See [`NOTICE`](NOTICE) for the repository notice that should stay with redistributed copies.
