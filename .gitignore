@@ -1,0 +1,5 @@
+.DS_Store
+.pio/
+LongLivedAccessToken.txt
+src/secrets.h
+src/*.BAK
