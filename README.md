@@ -1,15 +1,16 @@
 # CloudAndCoin
 
-ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls live weather and crypto data from Home Assistant, fetches a 4-day forecast from OpenWeather, and renders 30-day sparkline history for supported coins.
+ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls current weather and a 4-day forecast from OpenWeather, fetches live crypto prices and history from CoinGecko, and can be viewed or configured over Wi-Fi.
 
 For the current SD-card setup flow, see [`docs/quick-install.md`](docs/quick-install.md).
 
 ## What It Does
 - Shows the current weather, condition, high, low, and pressure
 - Displays a 4-day OpenWeather forecast
-- Tracks BTC, ETH, and ADA prices from Home Assistant
+- Tracks configurable cryptocurrency prices from CoinGecko
 - Draws 30-day sparkline history using CoinGecko data
 - Supports swipe navigation between weather and crypto screens
+- Provides a responsive web view for remote weather, crypto, battery, and memory status
 - Runs on an ESP32 with an ILI9486 TFT and XPT2046 touch controller
 
 ## Stack
@@ -43,30 +44,17 @@ Display-related settings are defined in [`platformio.ini`](platformio.ini), so y
 - `TOUCH_CS`: 33
 
 ## Data Sources
-- Home Assistant entities for current weather and live crypto prices
-- OpenWeather for the 4-day forecast
-- CoinGecko for 30-day BTC, ETH, and ADA price history
+- OpenWeather for current weather and the 4-day forecast
+- CoinGecko for current crypto prices and 30-day price history
 
 ## Required Secrets
 Copy [`src/secrets.example.h`](src/secrets.example.h) to `src/secrets.h` and fill in:
 
 - `SECRET_SSID`
 - `SECRET_WIFI_PASS`
-- `SECRET_HA_TOKEN`
 - `SECRET_OWM_API`
 
 `src/secrets.h` is intentionally ignored by git so credentials do not get pushed to GitHub.
-
-## Home Assistant Entities
-The current code expects these entity IDs in [`src/main.cpp`](src/main.cpp):
-
-- `weather.openweathermap`
-- `sensor.bitcoin_usd`
-- `sensor.ethereum_usd`
-- `sensor.cardano_usd`
-- `sensor.openweathermap_pressure`
-
-If your Home Assistant setup uses different entity names, update the constants near the top of `src/main.cpp`.
 
 ## SD Card Crypto List
 At boot, the app tries to read `/crypto_tickers.txt` from the root of the SD card.
@@ -114,7 +102,7 @@ If the SD card is missing, the file is missing, or no supported tickers are foun
 1. Install VS Code and the PlatformIO extension.
 2. Open this project folder in VS Code.
 3. Copy `src/secrets.example.h` to `src/secrets.h` and add your real credentials.
-4. Review the Home Assistant entity IDs in `src/main.cpp`.
+4. Put `secrets.txt` and `crypto_tickers.txt` on the SD card, or use the temporary setup network on first boot.
 5. Connect the ESP32.
 6. Build the project.
 7. Upload the firmware.
@@ -124,7 +112,7 @@ If the SD card is missing, the file is missing, or no supported tickers are foun
 - Board target: `esp32dev`
 - Framework: Arduino
 - C++ standard: `gnu++17`
-- Upload speed: `115200`
+- Upload speed: `460800`
 - Monitor speed: `115200`
 
 ## Repository Layout

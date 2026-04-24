@@ -11,7 +11,7 @@ Thanks for your interest in improving CloudAndCoin.
 - Keep changes focused and easy to review.
 - Do not commit secrets, tokens, API keys, or local credential files.
 - Update documentation when behavior, setup, or configuration changes.
-- If you change Home Assistant entity assumptions, hardware mappings, or setup steps, update the README too.
+- If you change data-source assumptions, hardware mappings, or setup steps, update the README too.
 
 ## Pull Requests
 - Describe what changed and why.

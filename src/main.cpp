@@ -34,8 +34,8 @@
 // Never connect a LiPo directly to an ESP32 ADC pin; use a safe divider if needed.
 #define ENABLE_BATTERY_MONITOR 1
 #define BATTERY_ADC_PIN        34
-#define BATTERY_ADC_REF_V      3.3f
 #define BATTERY_DIVIDER_RATIO  2.0f
+#define BATTERY_CALIBRATION    1.0f
 #define BATTERY_MIN_V          3.20f
 #define BATTERY_MAX_V          4.20f
 #define BATTERY_SAMPLE_COUNT   8
@@ -166,12 +166,16 @@ DeviceConfig deviceConfig;
 DeviceConfigStatus deviceConfigStatus;
 
 int lastBatteryRaw = -1;
+int lastBatteryAdcMv = -1;
 float lastBatteryVoltage = NAN;
 int lastBatteryPercent = -1;
 unsigned long lastBatteryReadMs = 0;
 
 ForecastDay forecast[4];
 bool forecast_ok = false;
+bool currentWeatherOk = false;
+float currentWeatherTemp = NAN;
+float currentWeatherPressure = NAN;
 int todayHigh = 0;
 int todayLow = 0;
 bool todayHiLoOk = false;
@@ -181,6 +185,7 @@ PressureTrend currentPressureTrend = PRESSURE_TREND_SAME;
 // ---------------- UI refs ----------------
 lv_obj_t *status_label;
 lv_obj_t *battery_label;
+lv_obj_t *memory_label;
 
 lv_obj_t *weather_page;
 lv_obj_t *crypto_page;
@@ -362,6 +367,9 @@ void applyTimezoneConfig();
 void startSetupAccessPoint();
 void showSetupInstructions();
 void updateBatteryStatus(bool force = false);
+void handleRemoteViewRoot();
+const char* weatherIconCode(const char *condIn);
+String formatMemoryText();
 void renderCryptoWindow();
 void updateCryptoAutoScroll();
 void startCryptoHistoryRefresh();
@@ -390,9 +398,19 @@ int readBatteryRaw() {
   return total / BATTERY_SAMPLE_COUNT;
 }
 
-float batteryVoltageFromRaw(int raw) {
-  if (raw < 0) return NAN;
-  return ((float)raw / 4095.0f) * BATTERY_ADC_REF_V * BATTERY_DIVIDER_RATIO;
+int readBatteryAdcMilliVolts() {
+  if (!batteryMonitorEnabled()) return -1;
+
+  uint32_t total = 0;
+  for (int i = 0; i < BATTERY_SAMPLE_COUNT; i++) {
+    total += analogReadMilliVolts(BATTERY_ADC_PIN);
+  }
+  return (int)(total / BATTERY_SAMPLE_COUNT);
+}
+
+float batteryVoltageFromAdcMilliVolts(int adcMv) {
+  if (adcMv < 0) return NAN;
+  return ((float)adcMv / 1000.0f) * BATTERY_DIVIDER_RATIO * BATTERY_CALIBRATION;
 }
 
 int batteryPercentFromVoltage(float voltage) {
@@ -444,16 +462,26 @@ void updateBatteryStatus(bool force) {
   lastBatteryReadMs = now;
 
   lastBatteryRaw = readBatteryRaw();
-  lastBatteryVoltage = batteryVoltageFromRaw(lastBatteryRaw);
+  lastBatteryAdcMv = readBatteryAdcMilliVolts();
+  lastBatteryVoltage = batteryVoltageFromAdcMilliVolts(lastBatteryAdcMv);
   lastBatteryPercent = batteryPercentFromVoltage(lastBatteryVoltage);
 
   char text[24];
-  if (lastBatteryRaw < 0 || isnan(lastBatteryVoltage) || lastBatteryPercent < 0) {
+  if (lastBatteryRaw < 0 || lastBatteryAdcMv < 0 || isnan(lastBatteryVoltage) || lastBatteryPercent < 0) {
     snprintf(text, sizeof(text), "Batt --");
   } else {
     snprintf(text, sizeof(text), "Batt %.2fV %d%%", lastBatteryVoltage, lastBatteryPercent);
   }
   lv_label_set_text(battery_label, text);
+
+  if (memory_label) {
+    String memoryText = "Mem ";
+    memoryText += formatMemoryText();
+    lv_label_set_text(memory_label, memoryText.c_str());
+  }
+
+  Serial.printf("Battery: raw=%d adc=%dmV pack=%.2fV percent=%d%%\n",
+                lastBatteryRaw, lastBatteryAdcMv, lastBatteryVoltage, lastBatteryPercent);
 }
 
 bool containsIgnoreCase(const char *haystack, const char *needle) {
@@ -831,7 +859,7 @@ String editorChromeStart(const char *title, const char *subtitle) {
   body += "</p>";
   if (!setupModeActive) {
     body += "<div class=\"nav\">";
-    body += "<a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
+    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
     body += "</div>";
   }
   return body;
@@ -1091,6 +1119,183 @@ void handleSetupSave() {
   ESP.restart();
 }
 
+const char* pressureTrendLabel(PressureTrend trend) {
+  switch (trend) {
+    case PRESSURE_TREND_BETTER: return "Improving";
+    case PRESSURE_TREND_WORSE: return "Falling";
+    case PRESSURE_TREND_SAME:
+    default: return "Steady";
+  }
+}
+
+String formatBatteryText() {
+  if (!batteryMonitorEnabled()) return "Battery monitor off";
+  if (lastBatteryRaw < 0 || lastBatteryAdcMv < 0 || isnan(lastBatteryVoltage) || lastBatteryPercent < 0) {
+    return "Battery unavailable";
+  }
+
+  char text[40];
+  snprintf(text, sizeof(text), "%.2fV  %d%%", lastBatteryVoltage, lastBatteryPercent);
+  return String(text);
+}
+
+String formatMemoryText() {
+  uint32_t heapSize = ESP.getHeapSize();
+  uint32_t freeHeap = ESP.getFreeHeap();
+  uint32_t usedHeap = heapSize > freeHeap ? heapSize - freeHeap : 0;
+  int usedPercent = heapSize > 0 ? (int)roundf(((float)usedHeap * 100.0f) / (float)heapSize) : 0;
+
+  char text[48];
+  snprintf(text, sizeof(text), "%d%%  %lu/%lu KB",
+           usedPercent,
+           (unsigned long)(usedHeap / 1024),
+           (unsigned long)(heapSize / 1024));
+  return String(text);
+}
+
+String formatCryptoPrice(float value, int decimals) {
+  if (isnan(value)) return "N/A";
+
+  char priceBuf[24];
+  dtostrf(value, 0, decimals, priceBuf);
+  char *trimmed = priceBuf;
+  while (*trimmed == ' ') ++trimmed;
+
+  String text = "$";
+  text += trimmed;
+  return text;
+}
+
+String cryptoDirectionClass(float currentVal, float prevVal) {
+  if (isnan(currentVal) || isnan(prevVal)) return "flat";
+  if (currentVal > prevVal) return "up";
+  if (currentVal < prevVal) return "down";
+  return "flat";
+}
+
+String cryptoDirectionText(float currentVal, float prevVal) {
+  if (isnan(currentVal) || isnan(prevVal)) return "-";
+  if (currentVal > prevVal) return "^";
+  if (currentVal < prevVal) return "v";
+  return "-";
+}
+
+void handleRemoteViewRoot() {
+  if (!ensureWebAuthorized()) return;
+
+  String body;
+  body.reserve(18000);
+  body += "<!doctype html><html><head><meta charset=\"utf-8\">";
+  body += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
+  body += "<meta http-equiv=\"refresh\" content=\"30\">";
+  body += "<title>Cloud and Coin View</title><style>";
+  body += ":root{color-scheme:dark;--bg:#0f1216;--panel:#191f26;--line:#2d3744;--text:#eef3f8;--muted:#a9b6c4;--gold:#f4b400;--blue:#7ec8ff;--green:#54d67b;--red:#ff6b6b;}";
+  body += "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Helvetica,Arial,sans-serif;}";
+  body += ".wrap{max-width:1180px;margin:0 auto;padding:18px}.top{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:16px;}";
+  body += "h1{margin:0;font-size:28px;line-height:1.1}.sub{margin:5px 0 0;color:var(--muted);font-size:14px}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a{color:#9dd7ff;text-decoration:none;border:1px solid var(--line);padding:8px 10px;border-radius:8px;background:#121820;}";
+  body += ".status{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.pill{border:1px solid var(--line);background:#151b22;padding:12px;border-radius:8px}.pill b{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}.pill span{font-size:18px}";
+  body += ".grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.screen{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;min-width:0}.screen h2{margin:0 0 14px;font-size:18px;color:var(--muted)}";
+  body += ".weather-main{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}.temp{font-size:64px;font-weight:700;line-height:.95}.cond{font-size:24px;color:#d9dde3;margin-top:8px}.badge{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:#222b34;border:1px solid var(--line);font-weight:700;color:var(--gold)}";
+  body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
+  body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
+  body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
+  body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
+  body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
+  body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 30 seconds.</p></div>";
+  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
+
+  body += "<div class=\"status\"><div class=\"pill\"><b>Battery</b><span>";
+  body += htmlEscape(formatBatteryText());
+  body += "</span></div><div class=\"pill\"><b>Memory</b><span>";
+  body += htmlEscape(formatMemoryText());
+  body += "</span></div><div class=\"pill\"><b>Network</b><span>";
+  body += WiFi.status() == WL_CONNECTED ? htmlEscape(WiFi.localIP().toString()) : "Disconnected";
+  body += "</span></div><div class=\"pill\"><b>Screen</b><span>";
+  body += currentPage == 0 ? "Weather" : "Crypto";
+  body += "</span></div></div>";
+
+  body += "<div class=\"grid\"><section class=\"screen\"><h2>Weather</h2><div class=\"weather-main\"><div>";
+  if (currentWeatherOk && !isnan(currentWeatherTemp)) {
+    char tempText[16];
+    snprintf(tempText, sizeof(tempText), "%d F", (int)round(currentWeatherTemp));
+    body += "<div class=\"temp\">";
+    body += tempText;
+    body += "</div>";
+  } else {
+    body += "<div class=\"temp\">-- F</div>";
+  }
+  body += "<div class=\"cond\">";
+  body += htmlEscape(currentWeatherOk ? String(currentWeatherCond) : String("Unavailable"));
+  body += "</div></div><div class=\"badge\">";
+  body += htmlEscape(String(weatherIconCode(currentWeatherCond)));
+  body += "</div></div>";
+
+  body += "<div class=\"metrics\"><div class=\"metric\"><b>High</b><span class=\"hi\">";
+  if (todayHiLoOk) {
+    char hiText[12];
+    snprintf(hiText, sizeof(hiText), "%d F", todayHigh);
+    body += hiText;
+  } else {
+    body += "-- F";
+  }
+  body += "</span></div><div class=\"metric\"><b>Low</b><span class=\"lo\">";
+  if (todayHiLoOk) {
+    char loText[12];
+    snprintf(loText, sizeof(loText), "%d F", todayLow);
+    body += loText;
+  } else {
+    body += "-- F";
+  }
+  body += "</span></div><div class=\"metric\"><b>Pressure</b><span>";
+  if (currentWeatherOk && !isnan(currentWeatherPressure)) {
+    char pressureText[18];
+    snprintf(pressureText, sizeof(pressureText), "%d hPa", (int)round(currentWeatherPressure));
+    body += pressureText;
+  } else {
+    body += "--";
+  }
+  body += "</span><div class=\"sub\">";
+  body += pressureTrendLabel(currentPressureTrend);
+  body += "</div></div></div>";
+
+  body += "<div class=\"forecast\">";
+  for (int i = 0; i < 4; i++) {
+    body += "<div class=\"day\"><b>";
+    body += htmlEscape(forecast_ok ? String(forecast[i].day) : String("---"));
+    body += "</b><div class=\"range\">";
+    if (forecast_ok) {
+      char rangeText[18];
+      snprintf(rangeText, sizeof(rangeText), "%d/%d F", forecast[i].high, forecast[i].low);
+      body += rangeText;
+    } else {
+      body += "--/-- F";
+    }
+    body += "</div><div class=\"small\">";
+    body += htmlEscape(forecast_ok ? String(forecast[i].cond) : String("N/A"));
+    body += "</div></div>";
+  }
+  body += "</div></section>";
+
+  body += "<section class=\"screen\"><h2>Crypto</h2><div class=\"crypto-list\">";
+  for (int i = 0; i < configuredCryptoCount; i++) {
+    String directionClass = cryptoDirectionClass(currentCryptoValues[i], previousCryptoValues[i]);
+    body += "<div class=\"coin\"><div class=\"sym\">";
+    body += htmlEscape(String(activeCryptos[i].symbol));
+    body += "</div><div class=\"price ";
+    body += directionClass;
+    body += "\">";
+    body += htmlEscape(formatCryptoPrice(currentCryptoValues[i], activeCryptos[i].decimals));
+    body += "</div><div class=\"dir ";
+    body += directionClass;
+    body += "\">";
+    body += cryptoDirectionText(currentCryptoValues[i], previousCryptoValues[i]);
+    body += "</div></div>";
+  }
+  body += "</div></section></div></div></body></html>";
+
+  webServer.send(200, "text/html", body);
+}
+
 void sendInfoPage() {
   if (!ensureWebAuthorized()) return;
 
@@ -1151,6 +1356,7 @@ void startWebEditor() {
     webServer.on("/secrets", HTTP_GET, handleSecretsEditorRoot);
     webServer.on("/secrets/save", HTTP_POST, handleSecretsEditorSave);
     webServer.on("/secrets/save-reboot", HTTP_POST, handleSecretsSaveAndReboot);
+    webServer.on("/view", HTTP_GET, handleRemoteViewRoot);
     webServer.on("/info", HTTP_GET, handleInfoRoot);
   }
   webServer.onNotFound(handleTickerEditorNotFound);
@@ -1801,6 +2007,9 @@ void updateWeather() {
   char cond[16];
 
   if (!fetchCurrentWeather(temp, pressure, cond, sizeof(cond))) {
+    currentWeatherOk = false;
+    currentWeatherTemp = NAN;
+    currentWeatherPressure = NAN;
     copyText(currentWeatherCond, sizeof(currentWeatherCond), "unknown");
     currentPressureTrend = PRESSURE_TREND_SAME;
     lv_label_set_text(weather_title_label, "Weather");
@@ -1817,6 +2026,9 @@ void updateWeather() {
   }
 
   copyText(currentWeatherCond, sizeof(currentWeatherCond), cond, "unknown");
+  currentWeatherOk = true;
+  currentWeatherTemp = temp;
+  currentWeatherPressure = pressure;
   currentPressureTrend = evaluatePressureTrend(pressure);
 
   lv_label_set_text(weather_title_label, "Weather");
@@ -2315,6 +2527,15 @@ void buildUI() {
   lv_obj_set_style_text_align(battery_label, LV_TEXT_ALIGN_LEFT, 0);
   lv_obj_set_pos(battery_label, 14, 298);
 
+  memory_label = lv_label_create(scr);
+  lv_label_set_text(memory_label, "Mem ...");
+  lv_obj_set_style_text_font(memory_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(memory_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_set_width(memory_label, 150);
+  lv_label_set_long_mode(memory_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_align(memory_label, LV_TEXT_ALIGN_LEFT, 0);
+  lv_obj_set_pos(memory_label, 204, 298);
+
   setup_page = lv_obj_create(scr);
   lv_obj_set_size(setup_page, PAGE_W, PAGE_H);
   lv_obj_set_pos(setup_page, PAGE_X, PAGE_Y);
@@ -2467,6 +2688,7 @@ void setup() {
 
   if (batteryMonitorEnabled()) {
     analogReadResolution(12);
+    analogSetPinAttenuation(BATTERY_ADC_PIN, ADC_11db);
     pinMode(BATTERY_ADC_PIN, INPUT);
   }
 
