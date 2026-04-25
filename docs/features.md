@@ -32,13 +32,16 @@
 
 - `1-4` configured tickers: fixed crypto layout with sparklines
 - `5-10` configured tickers: scrolling crypto list without sparklines
+- 30-day history is loaded in the background for sparkline-capable layouts and missing history is retried
 
 Future larger-list design notes are captured in [`future-crypto-scaling.md`](future-crypto-scaling.md).
 
 ## Web Interface
 
+- `http://cloudandcoin.local/`
+- `http://cloudandcoin.local/view`
 - `http://cloudandcoin.local/tickers`
 - `http://cloudandcoin.local/secrets`
 - `http://cloudandcoin.local/info`
 
-The web pages use the `Cloud and Coin` branding and support immediate ticker reload after saving.
+The web pages use the `Cloud and Coin` branding, show battery/memory/network/local-time status, and support immediate ticker reload after saving.

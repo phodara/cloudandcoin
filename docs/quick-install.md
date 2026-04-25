@@ -97,8 +97,10 @@ You have two setup paths.
 2. Insert the SD card and power on the device.
 3. The device will read the file and try to join your Wi-Fi network.
 4. If successful, browse to:
-   - `http://cloudandcoin.local/tickers`
+   - `http://cloudandcoin.local/`
+   - `http://cloudandcoin.local/view`
    - `http://cloudandcoin.local/secrets`
+   - `http://cloudandcoin.local/tickers`
    - `http://cloudandcoin.local/info`
 
 ### Option 2: Use the Temporary Setup Network
@@ -137,6 +139,8 @@ The web pages use HTTP Basic auth when `web_password` is set.
 
 After the device is online:
 
+- `http://cloudandcoin.local/` opens the live web view
+- `http://cloudandcoin.local/view` opens the live web view
 - `http://cloudandcoin.local/tickers` edits `/crypto_tickers.txt`
 - `http://cloudandcoin.local/secrets` edits `/secrets.txt`
 - `http://cloudandcoin.local/info` shows repository, license, notice, and contribution details

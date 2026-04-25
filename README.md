@@ -10,7 +10,7 @@ For the current SD-card setup flow, see [`docs/quick-install.md`](docs/quick-ins
 - Tracks configurable cryptocurrency prices from CoinGecko
 - Draws 30-day sparkline history using CoinGecko data
 - Supports swipe navigation between weather and crypto screens
-- Provides a responsive web view for remote weather, crypto, battery, and memory status
+- Provides a responsive web view for remote weather, crypto, battery, memory, and local time status
 - Runs on an ESP32 with an ILI9486 TFT and XPT2046 touch controller
 
 ## Stack
@@ -78,6 +78,7 @@ Currently supported tickers:
 - `BTC`
 - `ETH`
 - `ADA`
+- `DOGE`
 
 Example file:
 - [`sdcard/crypto_tickers.txt`](sdcard/crypto_tickers.txt)
@@ -94,6 +95,7 @@ ADA|cardano|3
 Display behavior:
 - `1-4` configured tickers: fixed crypto page with sparklines enabled
 - `5-10` configured tickers: scrolling crypto list, sparklines disabled
+- Crypto prices are fetched once at boot, every 60 seconds on the Crypto screen, and every 5 minutes while the device stays on Weather
 - The ticker list reloads at boot and after saving through the web editor
 
 If the SD card is missing, the file is missing, or no supported tickers are found, the app falls back to its default list.
@@ -116,14 +118,15 @@ If the SD card is missing, the file is missing, or no supported tickers are foun
 - Monitor speed: `115200`
 
 ## Repository Layout
-- [`src/main.cpp`](src/main.cpp): main application logic and UI
+- [`src/main.cpp`](src/main.cpp): shared firmware state plus setup and loop orchestration
+- [`src/app/`](src/app/): focused app source fragments included by `main.cpp`
 - [`src/secrets.example.h`](src/secrets.example.h): safe template for local credentials
 - [`include/lv_conf.h`](include/lv_conf.h): LVGL configuration
 - [`platformio.ini`](platformio.ini): board, libraries, and display flags
 
 ## Notes
 - The display is configured for landscape orientation with a 480x320 framebuffer.
-- Forecast refresh, history refresh, and UI behavior are defined in `src/main.cpp`.
+- Forecast refresh, history refresh, and UI behavior are split across `src/main.cpp` and `src/app/`.
 - Touch calibration values are currently hardcoded for this hardware setup.
 
 ## License

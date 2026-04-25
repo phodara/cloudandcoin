@@ -1,5 +1,7 @@
 # SD Card Minimal Changes
 
+Historical note: this document records the original minimal SD-card integration approach. The current firmware has since been refactored into `src/main.cpp` plus source fragments under `src/app/`, and the crypto limit/behavior has grown beyond the early examples below.
+
 This note captures the minimum code changes needed to add SD-card-based ticker loading without changing the page-swipe logic.
 
 ## Goal
