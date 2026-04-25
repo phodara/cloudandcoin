@@ -33,6 +33,8 @@
 - `1-4` configured tickers: fixed crypto layout with sparklines
 - `5-10` configured tickers: scrolling crypto list without sparklines
 
+Future larger-list design notes are captured in [`future-crypto-scaling.md`](future-crypto-scaling.md).
+
 ## Web Interface
 
 - `http://cloudandcoin.local/tickers`
