@@ -392,18 +392,18 @@ void drawCryptoSparklines() {
 
   drawCryptoBadges();
   for (int slot = 0; slot < CRYPTO_VISIBLE_ROWS; slot++) {
-    lv_obj_t *box = cryptoBoxAt(slot);
+    int boxX = PAGE_X + CRYPTO_BOX_X;
+    int boxY = PAGE_Y + CRYPTO_ROW_BOX_Y[slot];
     int activeIndex = cryptoActiveIndexForSlot(slot);
     if (activeIndex < 0) {
-      if (box) {
-        lv_area_t a;
-        lv_obj_get_coords(box, &a);
-        tft.fillRect(a.x1 + 1, a.y1 + 1, a.x2 - a.x1 - 1, a.y2 - a.y1 - 1, TFT_BLACK);
-      }
+      tft.fillRect(boxX + 1, boxY + 1, BOX_W - 2, BOX_H - 2, TFT_BLACK);
       continue;
     }
-    drawSparklineInLvglBox(
-      box,
+    drawSparklineInBox(
+      boxX,
+      boxY,
+      BOX_W,
+      BOX_H,
       cryptoHistoryAt(activeIndex),
       *cryptoHistoryOkAt(activeIndex),
       activeCryptos[activeIndex].sparkPlaceholderColor
