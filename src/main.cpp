@@ -86,6 +86,8 @@ const int webViewRefreshAfterCryptoRequestSeconds = 8;
 
 unsigned long lastHistoryRefresh = 0;
 const unsigned long historyRefreshIntervalMs = 2UL * 60UL * 60UL * 1000UL;
+unsigned long nextCryptoHistoryRetryMs = 0;
+const unsigned long cryptoHistoryRetryIntervalMs = 30000UL;
 
 unsigned long lastForecastRefresh = 0;
 const unsigned long forecastRefreshIntervalMs = 3UL * 60UL * 60UL * 1000UL;
@@ -116,6 +118,7 @@ bool weatherBadgesDirty = true;
 bool cryptoRefreshPending = false;
 bool cryptoWebRefreshPending = false;
 bool cryptoHistoryRefreshPending = false;
+bool cryptoHistoryRetryMissingOnly = false;
 bool setupModeActive = false;
 int cryptoHistoryRefreshIndex = -1;
 unsigned long lastCryptoHistoryStepMs = 0;

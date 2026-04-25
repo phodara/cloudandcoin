@@ -505,14 +505,37 @@ void updateHistorySparklines() {
 void startCryptoHistoryRefresh() {
   cryptoHistoryRefreshPending = configuredCryptoCount > 0;
   cryptoHistoryRefreshIndex = cryptoHistoryRefreshPending ? 0 : -1;
+  cryptoHistoryRetryMissingOnly = false;
   lastCryptoHistoryStepMs = 0;
+  nextCryptoHistoryRetryMs = 0;
 }
 
 void stepCryptoHistoryRefresh() {
   if (!cryptoHistoryRefreshPending || cryptoHistoryRefreshIndex < 0) return;
 
   unsigned long now = millis();
+  if (nextCryptoHistoryRetryMs != 0 && (long)(now - nextCryptoHistoryRetryMs) < 0) {
+    return;
+  }
+  nextCryptoHistoryRetryMs = 0;
+
   if (lastCryptoHistoryStepMs != 0 && (now - lastCryptoHistoryStepMs) < CRYPTO_HISTORY_STEP_INTERVAL_MS) {
+    return;
+  }
+
+  if (cryptoHistoryRetryMissingOnly) {
+    while (cryptoHistoryRefreshIndex < configuredCryptoCount &&
+           *cryptoHistoryOkAt(cryptoHistoryRefreshIndex)) {
+      cryptoHistoryRefreshIndex++;
+    }
+  }
+
+  if (cryptoHistoryRefreshIndex >= configuredCryptoCount) {
+    cryptoHistoryRefreshPending = false;
+    cryptoHistoryRefreshIndex = -1;
+    cryptoHistoryRetryMissingOnly = false;
+    lastHistoryRefresh = millis();
+    if (currentPage == 1) set_status("Updated");
     return;
   }
 
@@ -527,10 +550,18 @@ void stepCryptoHistoryRefresh() {
   cryptoHistoryRefreshIndex++;
 
   if (cryptoHistoryRefreshIndex >= configuredCryptoCount) {
-    cryptoHistoryRefreshPending = false;
-    cryptoHistoryRefreshIndex = -1;
-    lastHistoryRefresh = millis();
-    if (currentPage == 1) set_status("Updated");
+    if (allCryptoHistoryReady()) {
+      cryptoHistoryRefreshPending = false;
+      cryptoHistoryRefreshIndex = -1;
+      cryptoHistoryRetryMissingOnly = false;
+      lastHistoryRefresh = millis();
+      if (currentPage == 1) set_status("Updated");
+    } else {
+      cryptoHistoryRetryMissingOnly = true;
+      cryptoHistoryRefreshIndex = 0;
+      nextCryptoHistoryRetryMs = millis() + cryptoHistoryRetryIntervalMs;
+      if (currentPage == 1) set_status("Retry history...");
+    }
   }
 }
 
