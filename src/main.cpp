@@ -381,6 +381,7 @@ void renderCryptoWindow();
 void updateCryptoAutoScroll();
 void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
+void drawCryptoSparklines();
 
 #include "app/helpers.inc"
 #include "app/web.inc"

@@ -26,6 +26,9 @@ void showPage(int page) {
   }
 
   lv_refr_now(nullptr);
+  if (currentPage == 1 && !cryptoAutoScrollEnabled()) {
+    drawCryptoSparklines();
+  }
 }
 
 // ---------------- Tap ----------------
@@ -568,4 +571,3 @@ void showSetupInstructions() {
   lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_refr_now(nullptr);
 }
-
