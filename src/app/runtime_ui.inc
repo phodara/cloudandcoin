@@ -392,8 +392,8 @@ void drawCryptoSparklines() {
 
   drawCryptoBadges();
   for (int slot = 0; slot < CRYPTO_VISIBLE_ROWS; slot++) {
-    int boxX = PAGE_X + CRYPTO_BOX_X;
-    int boxY = PAGE_Y + CRYPTO_ROW_BOX_Y[slot];
+    int boxX = PAGE_X + lv_obj_get_style_pad_left(crypto_page, 0) + CRYPTO_BOX_X;
+    int boxY = PAGE_Y + lv_obj_get_style_pad_top(crypto_page, 0) + CRYPTO_ROW_BOX_Y[slot];
     int activeIndex = cryptoActiveIndexForSlot(slot);
     if (activeIndex < 0) {
       tft.fillRect(boxX + 1, boxY + 1, BOX_W - 2, BOX_H - 2, TFT_BLACK);
@@ -493,7 +493,8 @@ void updateHistorySparklines() {
   int count = 0;
 
   for (int i = 0; i < configuredCryptoCount; i++) {
-    *cryptoHistoryOkAt(i) = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
+    bool ok = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
+    if (ok || !*cryptoHistoryOkAt(i)) *cryptoHistoryOkAt(i) = ok;
     if (i < configuredCryptoCount - 1) delay(700);
   }
 
@@ -519,7 +520,8 @@ void stepCryptoHistoryRefresh() {
 
   int count = 0;
   int i = cryptoHistoryRefreshIndex;
-  *cryptoHistoryOkAt(i) = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
+  bool ok = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
+  if (ok || !*cryptoHistoryOkAt(i)) *cryptoHistoryOkAt(i) = ok;
   cryptoSparklinesDirty = true;
   lastCryptoHistoryStepMs = now;
   cryptoHistoryRefreshIndex++;
