@@ -87,6 +87,7 @@ const unsigned long forecastRefreshIntervalMs = 3UL * 60UL * 60UL * 1000UL;
 
 // ---------------- Tap detection ----------------
 bool touchDown = false;
+bool touchNavigatedOnPress = false;
 int touchDownX = 0;
 int touchDownY = 0;
 int touchCurrentX = 0;
@@ -1962,7 +1963,8 @@ void handleTapToggle() {
     Serial.printf("Tap debug: dx=%d dy=%d pressMs=%lu\n", dx, dy, pressMs);
 #endif
 
-    if (dx <= tapMoveThreshold && dy <= tapMoveThreshold &&
+    if (!touchNavigatedOnPress &&
+        dx <= tapMoveThreshold && dy <= tapMoveThreshold &&
         pressMs >= tapMinMs && pressMs <= tapMaxMs) {
 #if TOUCH_DEBUG
       Serial.println("Tap debug: accepted");
@@ -1976,6 +1978,7 @@ void handleTapToggle() {
     }
 
     touchDown = false;
+    touchNavigatedOnPress = false;
     return;
   }
 
@@ -1988,11 +1991,20 @@ void handleTapToggle() {
 
   if (!touchDown) {
     touchDown = true;
+    touchNavigatedOnPress = false;
     touchDownX = x;
     touchDownY = y;
     touchCurrentX = x;
     touchCurrentY = y;
     touchDownMs = millis();
+
+    if (currentPage == 1) {
+#if TOUCH_DEBUG
+      Serial.println("Tap debug: crypto page press accepted");
+#endif
+      touchNavigatedOnPress = true;
+      showPage(0);
+    }
     return;
   }
 
