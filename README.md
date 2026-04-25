@@ -1,4 +1,4 @@
-# CloudAndCoin
+# Cloud and Coin
 
 ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls current weather and a 4-day forecast from OpenWeather, fetches live crypto prices and history from CoinGecko, and can be viewed or configured over Wi-Fi.
 

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in improving CloudAndCoin.
+Thanks for your interest in improving Cloud and Coin.
 
 ## Before You Contribute
 - Please read the [`LICENSE`](LICENSE) first.

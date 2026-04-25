@@ -44,14 +44,14 @@
 // ---------------- WiFi ----------------
 const char* DEFAULT_WIFI_SSID = SECRET_SSID;
 const char* DEFAULT_WIFI_PASS = SECRET_WIFI_PASS;
-const char* DEFAULT_MDNS_HOSTNAME = "weathercrypto";
+const char* DEFAULT_MDNS_HOSTNAME = "cloudandcoin";
 
 // ---------------- OpenWeather ----------------
 const char* DEFAULT_OWM_API_KEY  = SECRET_OWM_API;
 const char* DEFAULT_OWM_LOCATION = "Mount Kisco,US";
 const char* DEFAULT_TIMEZONE = "America/New_York";
 const char* DEFAULT_WEB_PASSWORD = "";
-const char* DEFAULT_SETUP_AP_NAME = "weathercrypto-setup";
+const char* DEFAULT_SETUP_AP_NAME = "cloudandcoin-setup";
 const char* PROJECT_REPO_URL = "https://github.com/phodara/cloudandcoin";
 
 // ---------------- Hardware ----------------
@@ -78,6 +78,11 @@ const unsigned long weatherRefreshIntervalMs = 15000;
 
 unsigned long lastCryptoPriceRefresh = 0;
 const unsigned long cryptoPriceRefreshIntervalMs = 60000;
+const unsigned long cryptoBackgroundRefreshIntervalMs = 5UL * 60UL * 1000UL;
+unsigned long lastCryptoWebRefresh = 0;
+const unsigned long cryptoWebRefreshIntervalMs = 60000;
+const int webViewRefreshSeconds = 60;
+const int webViewRefreshAfterCryptoRequestSeconds = 8;
 
 unsigned long lastHistoryRefresh = 0;
 const unsigned long historyRefreshIntervalMs = 2UL * 60UL * 60UL * 1000UL;
@@ -109,6 +114,7 @@ int currentPage = 0;   // 0 = weather, 1 = crypto
 bool cryptoSparklinesDirty = true;
 bool weatherBadgesDirty = true;
 bool cryptoRefreshPending = false;
+bool cryptoWebRefreshPending = false;
 bool cryptoHistoryRefreshPending = false;
 bool setupModeActive = false;
 int cryptoHistoryRefreshIndex = -1;
@@ -814,7 +820,7 @@ bool webAuthRequired() {
 bool ensureWebAuthorized() {
   if (!webAuthRequired()) return true;
   if (webServer.authenticate("admin", deviceConfig.webPassword)) return true;
-  webServer.requestAuthentication(BASIC_AUTH, "CloudAndCoin", "Enter web password");
+  webServer.requestAuthentication(BASIC_AUTH, "Cloud and Coin", "Enter web password");
   return false;
 }
 
@@ -1035,13 +1041,13 @@ void handleSecretsSaveAndReboot() {
 void sendSetupPage(const char *message, bool success) {
   bool fileOk = false;
   String existingSecrets = loadTextFileFromSD(DEVICE_SECRETS_PATH, fileOk);
-  String body = editorChromeStart("Setup Mode", "Enter Wi-Fi and web access settings so the device can join your network.");
+  String body = editorChromeStart("Secrets Setup", "Enter Wi-Fi and web access settings so the device can join your network.");
   appendMessage(body, message, success);
   if (!fileOk) {
     body += "<div class=\"msg err\">No existing secrets.txt was found. Saving this form will create it.</div>";
   }
 
-  body += "<form method=\"POST\" action=\"/setup/save\">";
+  body += "<form method=\"POST\" action=\"/secrets/save\">";
   body += "<label for=\"wifi_ssid\">WiFi SSID</label><input id=\"wifi_ssid\" name=\"wifi_ssid\" value=\"";
   body += htmlEscape(deviceConfig.wifiSsid);
   body += "\">";
@@ -1154,6 +1160,18 @@ String formatMemoryText() {
   return String(text);
 }
 
+String formatLocalTimeText() {
+  time_t now = time(nullptr);
+  if (now < 100000) return "Time unavailable";
+
+  struct tm localTm;
+  localtime_r(&now, &localTm);
+
+  char text[32];
+  strftime(text, sizeof(text), "%b %d, %Y %I:%M %p", &localTm);
+  return String(text);
+}
+
 String formatCryptoPrice(float value, int decimals) {
   if (isnan(value)) return "N/A";
 
@@ -1184,11 +1202,20 @@ String cryptoDirectionText(float currentVal, float prevVal) {
 void handleRemoteViewRoot() {
   if (!ensureWebAuthorized()) return;
 
+  bool requestCryptoRefresh = false;
+  if (WiFi.status() == WL_CONNECTED && currentPage == 0 && !cryptoWebRefreshPending &&
+      (lastCryptoWebRefresh == 0 || millis() - lastCryptoWebRefresh >= cryptoWebRefreshIntervalMs)) {
+    cryptoWebRefreshPending = true;
+    requestCryptoRefresh = true;
+  }
+
   String body;
   body.reserve(18000);
   body += "<!doctype html><html><head><meta charset=\"utf-8\">";
   body += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
-  body += "<meta http-equiv=\"refresh\" content=\"30\">";
+  body += "<meta http-equiv=\"refresh\" content=\"";
+  body += requestCryptoRefresh ? webViewRefreshAfterCryptoRequestSeconds : webViewRefreshSeconds;
+  body += "\">";
   body += "<title>Cloud and Coin View</title><style>";
   body += ":root{color-scheme:dark;--bg:#0f1216;--panel:#191f26;--line:#2d3744;--text:#eef3f8;--muted:#a9b6c4;--gold:#f4b400;--blue:#7ec8ff;--green:#54d67b;--red:#ff6b6b;}";
   body += "*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Helvetica,Arial,sans-serif;}";
@@ -1202,7 +1229,7 @@ void handleRemoteViewRoot() {
   body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
   body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
-  body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 30 seconds.</p></div>";
+  body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
   body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
 
   body += "<div class=\"status\"><div class=\"pill\"><b>Battery</b><span>";
@@ -1211,8 +1238,8 @@ void handleRemoteViewRoot() {
   body += htmlEscape(formatMemoryText());
   body += "</span></div><div class=\"pill\"><b>Network</b><span>";
   body += WiFi.status() == WL_CONNECTED ? htmlEscape(WiFi.localIP().toString()) : "Disconnected";
-  body += "</span></div><div class=\"pill\"><b>Screen</b><span>";
-  body += currentPage == 0 ? "Weather" : "Crypto";
+  body += "</span></div><div class=\"pill\"><b>Local Time</b><span>";
+  body += htmlEscape(formatLocalTimeText());
   body += "</span></div></div>";
 
   body += "<div class=\"grid\"><section class=\"screen\"><h2>Weather</h2><div class=\"weather-main\"><div>";
@@ -1300,9 +1327,9 @@ void handleRemoteViewRoot() {
 void sendInfoPage() {
   if (!ensureWebAuthorized()) return;
 
-  String body = editorChromeStart("Project Info", "Repository, license, notice, and contribution guidance for WeatherCrypto.");
+  String body = editorChromeStart("Project Info", "Repository, license, notice, and contribution guidance for Cloud and Coin.");
   body += "<div class=\"section\"><h2>Attribution</h2>";
-  body += "<p>WeatherCrypto is created (with a little help from AI) and licensed by <strong>Paul Hodara</strong>.</p>";
+  body += "<p>Cloud and Coin is created (with a little help from AI) and licensed by <strong>Paul Hodara</strong>.</p>";
   body += "<p>Copyright 2026 Paul Hodara</p></div>";
 
   body += "<div class=\"section\"><h2>Repository</h2>";
@@ -1341,7 +1368,7 @@ void handleInfoRoot() {
 }
 
 void handleTickerEditorNotFound() {
-  webServer.sendHeader("Location", setupModeActive ? "/setup" : "/tickers", true);
+  webServer.sendHeader("Location", setupModeActive ? "/secrets" : "/view", true);
   webServer.send(302, "text/plain", "");
 }
 
@@ -1349,9 +1376,11 @@ void startWebEditor() {
   if (setupModeActive) {
     webServer.on("/", HTTP_GET, handleSetupRoot);
     webServer.on("/setup", HTTP_GET, handleSetupRoot);
+    webServer.on("/secrets", HTTP_GET, handleSetupRoot);
     webServer.on("/setup/save", HTTP_POST, handleSetupSave);
+    webServer.on("/secrets/save", HTTP_POST, handleSetupSave);
   } else {
-    webServer.on("/", HTTP_GET, handleTickerEditorRoot);
+    webServer.on("/", HTTP_GET, handleRemoteViewRoot);
     webServer.on("/tickers", HTTP_GET, handleTickerEditorRoot);
     webServer.on("/tickers/save", HTTP_POST, handleTickerEditorSave);
     webServer.on("/secrets", HTTP_GET, handleSecretsEditorRoot);
@@ -1362,8 +1391,8 @@ void startWebEditor() {
   }
   webServer.onNotFound(handleTickerEditorNotFound);
   webServer.begin();
-  if (setupModeActive) Serial.println("Setup editor: browse to http://192.168.4.1/setup");
-  else Serial.println("Web editor: browse to http://<device-ip>/tickers or /secrets");
+  if (setupModeActive) Serial.println("Setup editor: browse to http://192.168.4.1/secrets");
+  else Serial.println("Web editor: browse to http://<device-ip>/view");
 }
 
 void startMdns() {
@@ -2477,9 +2506,9 @@ void showSetupInstructions() {
   const char *setupText =
     "Initial Setup\n\n"
     "1. Join the temporary network:\n"
-    "   weathercrypto-setup\n\n"
+    "   cloudandcoin-setup\n\n"
     "2. Open:\n"
-    "   192.168.4.1/setup\n\n"
+    "   192.168.4.1/secrets\n\n"
     "3. Add your local network settings.";
 
   lv_label_set_text(setup_message_label, setupText);
@@ -2515,7 +2544,7 @@ void buildUI() {
 
   lv_obj_t *title = lv_label_create(scr);
   char titleText[24];
-  snprintf(titleText, sizeof(titleText), "Cloud & Coin v2.0");
+  snprintf(titleText, sizeof(titleText), "Cloud and Coin v2.0");
   lv_label_set_text(title, titleText);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
@@ -2753,6 +2782,8 @@ void setup() {
     refreshAll();
     fetchForecast4();
     updateForecastLabels();
+    updateCrypto();
+    lastCryptoPriceRefresh = millis();
     startCryptoHistoryRefresh();
 
     lastWeatherRefresh = millis();
@@ -2770,6 +2801,13 @@ void loop() {
   delay(5);
 
   if (setupModeActive) return;
+
+  if (cryptoWebRefreshPending) {
+    updateCrypto();
+    lastCryptoPriceRefresh = millis();
+    lastCryptoWebRefresh = lastCryptoPriceRefresh;
+    cryptoWebRefreshPending = false;
+  }
 
   if (millis() - lastWeatherRefresh >= weatherRefreshIntervalMs) {
     refreshAll(currentPage == 0);
@@ -2793,6 +2831,11 @@ void loop() {
     set_status("Updating...");
     updateCrypto();
     set_status("Updated");
+    lastCryptoPriceRefresh = millis();
+  }
+
+  if (currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
+    updateCrypto();
     lastCryptoPriceRefresh = millis();
   }
 

@@ -1,6 +1,6 @@
 # Features
 
-`Cloud & Coin` is an ESP32 touchscreen dashboard for weather and cryptocurrency monitoring.
+`Cloud and Coin` is an ESP32 touchscreen dashboard for weather and cryptocurrency monitoring.
 
 ## Core Features
 
@@ -35,8 +35,8 @@
 
 ## Web Interface
 
-- `http://weathercrypto.local/tickers`
-- `http://weathercrypto.local/secrets`
-- `http://weathercrypto.local/info`
+- `http://cloudandcoin.local/tickers`
+- `http://cloudandcoin.local/secrets`
+- `http://cloudandcoin.local/info`
 
 The web pages use the `Cloud and Coin` branding and support immediate ticker reload after saving.

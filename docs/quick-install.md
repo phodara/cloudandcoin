@@ -1,6 +1,6 @@
 # Quick Install
 
-This guide covers the fastest way to get `WeatherCrypto` running with the new SD-card-based setup flow.
+This guide covers the fastest way to get `Cloud and Coin` running with the new SD-card-based setup flow.
 
 ## What You Need
 
@@ -34,7 +34,7 @@ web_password=CHANGE_ME
 owm_api_key=YOUR_OPENWEATHER_API_KEY
 weather_location=Mount Kisco,US
 timezone=America/New_York
-mdns_hostname=weathercrypto
+mdns_hostname=cloudandcoin
 ```
 
 Notes:
@@ -85,7 +85,7 @@ Display behavior:
 
 - `1-4` configured tickers: fixed crypto page with sparklines enabled
 - `5-10` configured tickers: scrolling crypto list, sparklines disabled
-- Saving from `http://weathercrypto.local/tickers` reloads the ticker file immediately
+- Saving from `http://cloudandcoin.local/tickers` reloads the ticker file immediately
 
 ## First Boot Options
 
@@ -97,9 +97,9 @@ You have two setup paths.
 2. Insert the SD card and power on the device.
 3. The device will read the file and try to join your Wi-Fi network.
 4. If successful, browse to:
-   - `http://weathercrypto.local/tickers`
-   - `http://weathercrypto.local/secrets`
-   - `http://weathercrypto.local/info`
+   - `http://cloudandcoin.local/tickers`
+   - `http://cloudandcoin.local/secrets`
+   - `http://cloudandcoin.local/info`
 
 ### Option 2: Use the Temporary Setup Network
 
@@ -111,18 +111,18 @@ On the display you will see:
 Initial Setup
 
 1. Join the temporary network:
-   weathercrypto-setup
+   cloudandcoin-setup
 
 2. Open:
-   192.168.4.1/setup
+   192.168.4.1/secrets
 
 3. Add your local network settings.
 ```
 
 Then:
 
-1. Connect your phone or computer to `weathercrypto-setup`
-2. Open `http://192.168.4.1/setup`
+1. Connect your phone or computer to `cloudandcoin-setup`
+2. Open `http://192.168.4.1/secrets`
 3. Enter your local Wi-Fi, web password, and any other settings
 4. Save and reboot
 
@@ -137,9 +137,9 @@ The web pages use HTTP Basic auth when `web_password` is set.
 
 After the device is online:
 
-- `http://weathercrypto.local/tickers` edits `/crypto_tickers.txt`
-- `http://weathercrypto.local/secrets` edits `/secrets.txt`
-- `http://weathercrypto.local/info` shows repository, license, notice, and contribution details
+- `http://cloudandcoin.local/tickers` edits `/crypto_tickers.txt`
+- `http://cloudandcoin.local/secrets` edits `/secrets.txt`
+- `http://cloudandcoin.local/info` shows repository, license, notice, and contribution details
 
 ## Notes About Saving
 
