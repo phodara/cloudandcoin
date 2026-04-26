@@ -404,7 +404,7 @@ void handleRemoteViewRoot() {
   }
 
   String body;
-  body.reserve(22000);
+  body.reserve(24000);
   body += "<!doctype html><html><head><meta charset=\"utf-8\">";
   body += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   body += "<meta http-equiv=\"refresh\" content=\"";
@@ -421,9 +421,9 @@ void handleRemoteViewRoot() {
   body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
   body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
   body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
-  body += ".pair-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair-name{font-weight:700}.pair-signal{font-weight:700}.pair-bias{text-align:right}.strong{color:var(--green)}.med{color:var(--gold)}.weak{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
+  body += ".pair-list,.signal-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 72px 48px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-reason{color:var(--muted);text-align:right}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
   body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
-  body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}}";
+  body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 68px 42px 1fr}.sig-reason{text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
   body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
@@ -552,7 +552,42 @@ void handleRemoteViewRoot() {
       body += "</div></div>";
     }
   }
-  body += "</div><p class=\"sub\">Signals are candidates based on recent correlation and ratio divergence, not trade instructions.</p></section></div></div></body></html>";
+  body += "</div><p class=\"sub\">Signals are candidates based on recent correlation and ratio divergence, not trade instructions.</p></section>";
+
+#if ENABLE_TRADING_SIGNALS
+  body += "<section class=\"screen\"><h2>Signals</h2><div class=\"signal-list\">";
+  if (configuredCryptoCount <= 0) {
+    body += "<div class=\"empty\">Add crypto tickers to generate signals.</div>";
+  } else {
+    int visibleSignals = configuredCryptoCount < SIGNAL_VISIBLE_ROWS ? configuredCryptoCount : SIGNAL_VISIBLE_ROWS;
+    for (int i = 0; i < visibleSignals; i++) {
+      TradingSignalResult signal = calculateTradingSignal(i);
+      String actionClass = "hold";
+      if (strcmp(signal.action, "BUY") == 0) actionClass = "buy";
+      else if (strcmp(signal.action, "SELL") == 0) actionClass = "sell";
+      else if (strcmp(signal.action, "WATCH") == 0) actionClass = "watch";
+      else if (strcmp(signal.action, "WAIT") == 0) actionClass = "wait";
+
+      char scoreText[8];
+      snprintf(scoreText, sizeof(scoreText), "%+d", signal.score);
+
+      body += "<div class=\"signal\"><div class=\"sig-symbol\">";
+      body += htmlEscape(String(activeCryptos[i].symbol));
+      body += "</div><div class=\"sig-action ";
+      body += actionClass;
+      body += "\">";
+      body += htmlEscape(String(signal.action));
+      body += "</div><div>";
+      body += scoreText;
+      body += "</div><div class=\"sig-reason\">";
+      body += htmlEscape(String(signal.reason));
+      body += "</div></div>";
+    }
+  }
+  body += "</div><p class=\"sub\">Informational momentum signals from recent price history.</p></section>";
+#endif
+
+  body += "</div></div></body></html>";
 
   webServer.send(200, "text/html", body);
 }
