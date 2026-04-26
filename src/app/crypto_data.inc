@@ -20,6 +20,8 @@ bool fetchCurrentPricesUsd(float outVals[], int count) {
     }
 
     HTTPClient http;
+    http.setConnectTimeout(5000);
+    http.setTimeout(8000);
     char url[320];
     snprintf(
       url,
@@ -170,6 +172,7 @@ void loadCryptoConfigurationFromSD() {
 
   configuredCryptoCount = selectedCount;
   cryptoScrollOffset = 0;
+  pairTradingDirty = true;
 }
 
 // ---------------- CoinGecko history ----------------
@@ -181,6 +184,8 @@ bool fetchHistory30(const char* coinId, float outVals[], int &outCount) {
   }
 
   HTTPClient http;
+  http.setConnectTimeout(5000);
+  http.setTimeout(8000);
   char url[192];
   snprintf(
     url,
@@ -237,4 +242,3 @@ bool fetchHistory30(const char* coinId, float outVals[], int &outCount) {
   }
   return ok;
 }
-

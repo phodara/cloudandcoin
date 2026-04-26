@@ -112,8 +112,9 @@ const char* CRYPTO_TICKERS_PATH = "/crypto_tickers.txt";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = pair trading
 bool cryptoSparklinesDirty = true;
+bool pairTradingDirty = true;
 bool weatherBadgesDirty = true;
 bool cryptoRefreshPending = false;
 bool cryptoWebRefreshPending = false;
@@ -127,6 +128,7 @@ unsigned long lastCryptoHistoryStepMs = 0;
 const int HISTORY_POINTS = 30;
 const int MAX_ACTIVE_CRYPTO_COUNT = 10;
 const int CRYPTO_VISIBLE_ROWS = 4;
+const int PAIR_VISIBLE_ROWS = 4;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
 const unsigned long CRYPTO_HISTORY_STEP_INTERVAL_MS = 3000UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
@@ -199,10 +201,12 @@ lv_obj_t *memory_label;
 
 lv_obj_t *weather_page;
 lv_obj_t *crypto_page;
+lv_obj_t *pair_page;
 lv_obj_t *setup_page;
 lv_obj_t *setup_message_label;
 
 lv_obj_t *weather_title_label;
+lv_obj_t *pair_title_label;
 lv_obj_t *weather_temp_label;
 lv_obj_t *weather_cond_label;
 lv_obj_t *weather_hi_label;
@@ -215,6 +219,7 @@ lv_obj_t *forecast_cond_label[4];
 
 lv_obj_t *crypto_title_label;
 lv_obj_t *crypto_value_labels[CRYPTO_VISIBLE_ROWS];
+lv_obj_t *pair_value_labels[PAIR_VISIBLE_ROWS];
 
 // Sparkline boxes
 lv_obj_t *crypto_boxes[CRYPTO_VISIBLE_ROWS];
@@ -385,12 +390,14 @@ void updateCryptoAutoScroll();
 void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
 void drawCryptoSparklines();
+void pairTradingRender();
 
 #include "app/helpers.inc"
 #include "app/web.inc"
 #include "app/display_touch.inc"
 #include "app/crypto_data.inc"
 #include "app/weather_data.inc"
+#include "app/pair_trading.inc"
 #include "app/runtime_ui.inc"
 #include "app/ui_build.inc"
 // ---------------- WiFi ----------------
@@ -510,28 +517,33 @@ void loop() {
     lastWeatherRefresh = millis();
   }
 
-  if (currentPage == 1 && cryptoRefreshPending) {
+  if ((currentPage == 1 || currentPage == 2) && cryptoRefreshPending) {
     set_status("Updating...");
     updateCrypto();
+    pairTradingDirty = true;
+    if (currentPage == 2) pairTradingRender();
     set_status("Updated");
     lastCryptoPriceRefresh = millis();
     cryptoRefreshPending = false;
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
   }
 
-  if (currentPage == 1 && cryptoHistoryRefreshPending) {
+  if ((currentPage == 1 || currentPage == 2) && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
 
-  if (currentPage == 1 && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
+  if ((currentPage == 1 || currentPage == 2) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
     set_status("Updating...");
     updateCrypto();
+    pairTradingDirty = true;
+    if (currentPage == 2) pairTradingRender();
     set_status("Updated");
     lastCryptoPriceRefresh = millis();
   }
 
   if (currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
     updateCrypto();
+    pairTradingDirty = true;
     lastCryptoPriceRefresh = millis();
   }
 
@@ -542,6 +554,10 @@ void loop() {
   if (!cryptoAutoScrollEnabled() && cryptoSparklinesDirty && currentPage == 1) {
     lv_refr_now(nullptr);
     drawCryptoSparklines();
+  }
+
+  if (pairTradingDirty && currentPage == 2) {
+    pairTradingRender();
   }
 
   if (weatherBadgesDirty && currentPage == 0) {

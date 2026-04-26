@@ -172,6 +172,28 @@ void buildUI() {
     lv_obj_set_style_border_color(crypto_boxes[i], lv_color_hex(0x666666), 0);
   }
 
+  // Pair trading page
+  pair_page = lv_obj_create(scr);
+  lv_obj_set_size(pair_page, PAGE_W, PAGE_H);
+  lv_obj_set_pos(pair_page, PAGE_X, PAGE_Y);
+  style_panel(pair_page);
+
+  pair_title_label = lv_label_create(scr);
+  lv_label_set_text(pair_title_label, "Pair Trading");
+  lv_obj_set_style_text_font(pair_title_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(pair_title_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_align(pair_title_label, LV_ALIGN_TOP_MID, 0, 12);
+  lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+
+  for (int i = 0; i < PAIR_VISIBLE_ROWS; i++) {
+    pair_value_labels[i] = lv_label_create(pair_page);
+    lv_label_set_text(pair_value_labels[i], "--");
+    lv_obj_set_width(pair_value_labels[i], PAGE_W - 24);
+    lv_label_set_long_mode(pair_value_labels[i], LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(pair_value_labels[i], &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(pair_value_labels[i], lv_color_hex(0xCCCCCC), 0);
+    lv_obj_set_pos(pair_value_labels[i], 0, 24 + (i * 48));
+  }
+
   showPage(0);
 }
-

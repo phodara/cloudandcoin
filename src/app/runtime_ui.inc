@@ -7,13 +7,17 @@ void showPage(int page) {
     lv_obj_clear_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(weather_page);
     weatherBadgesDirty = true;
-  } else {
+  } else if (currentPage == 1) {
     lv_obj_clear_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(crypto_page);
     cryptoScrollOffset = 0;
     lastCryptoScrollMs = millis();
@@ -23,6 +27,17 @@ void showPage(int page) {
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
     else cryptoHistoryRefreshPending = false;
     cryptoSparklinesDirty = true;
+  } else {
+    lv_obj_clear_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(pair_page);
+    pairTradingDirty = true;
+    pairTradingRender();
+    if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
   }
 
   lv_refr_now(nullptr);
@@ -51,6 +66,7 @@ void handleTapToggle() {
       Serial.println("Tap debug: accepted");
 #endif
       if (currentPage == 0) showPage(1);
+      else if (currentPage == 1) showPage(2);
       else showPage(0);
     } else {
 #if TOUCH_DEBUG
@@ -79,13 +95,6 @@ void handleTapToggle() {
     touchCurrentY = y;
     touchDownMs = millis();
 
-    if (currentPage == 1) {
-#if TOUCH_DEBUG
-      Serial.println("Tap debug: crypto page press accepted");
-#endif
-      touchNavigatedOnPress = true;
-      showPage(0);
-    }
     return;
   }
 
@@ -500,6 +509,7 @@ void updateHistorySparklines() {
 
   lastHistoryRefresh = millis();
   cryptoSparklinesDirty = true;
+  pairTradingDirty = true;
 }
 
 void startCryptoHistoryRefresh() {
@@ -508,6 +518,7 @@ void startCryptoHistoryRefresh() {
   cryptoHistoryRetryMissingOnly = false;
   lastCryptoHistoryStepMs = 0;
   nextCryptoHistoryRetryMs = 0;
+  pairTradingDirty = true;
 }
 
 void stepCryptoHistoryRefresh() {
@@ -535,6 +546,7 @@ void stepCryptoHistoryRefresh() {
     cryptoHistoryRefreshIndex = -1;
     cryptoHistoryRetryMissingOnly = false;
     lastHistoryRefresh = millis();
+    pairTradingDirty = true;
     if (currentPage == 1) set_status("Updated");
     return;
   }
@@ -546,6 +558,7 @@ void stepCryptoHistoryRefresh() {
   bool ok = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
   if (ok || !*cryptoHistoryOkAt(i)) *cryptoHistoryOkAt(i) = ok;
   cryptoSparklinesDirty = true;
+  pairTradingDirty = true;
   lastCryptoHistoryStepMs = now;
   cryptoHistoryRefreshIndex++;
 
@@ -555,6 +568,7 @@ void stepCryptoHistoryRefresh() {
       cryptoHistoryRefreshIndex = -1;
       cryptoHistoryRetryMissingOnly = false;
       lastHistoryRefresh = millis();
+      pairTradingDirty = true;
       if (currentPage == 1) set_status("Updated");
     } else {
       cryptoHistoryRetryMissingOnly = true;
@@ -600,7 +614,9 @@ void showSetupInstructions() {
   lv_obj_clear_flag(setup_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_refr_now(nullptr);
 }

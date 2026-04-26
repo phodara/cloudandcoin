@@ -16,6 +16,7 @@ Fragments:
 - `display_touch.inc`: LVGL display flush and touch input
 - `crypto_data.inc`: crypto ticker loading and CoinGecko fetches
 - `weather_data.inc`: OpenWeather fetches and forecast parsing
+- `pair_trading.inc`: dynamic pair candidate scoring from configured crypto histories
 - `runtime_ui.inc`: page switching, refresh orchestration, drawing, and screen updates
 - `ui_build.inc`: LVGL styling and UI construction
 
