@@ -71,6 +71,7 @@ const int touchMinX = 493;
 const int touchMaxX = 3703;
 const int touchMinY = 555;
 const int touchMaxY = 3533;
+const int touchPressureMin = 80;
 
 // ---------------- Timing ----------------
 unsigned long lastWeatherRefresh = 0;

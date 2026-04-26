@@ -5,6 +5,7 @@ void style_screen(lv_obj_t *obj) {
   lv_obj_set_style_border_width(obj, 0, 0);
   lv_obj_set_style_pad_all(obj, 0, 0);
   lv_obj_set_style_radius(obj, 0, 0);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
 }
 
 void style_panel(lv_obj_t *obj) {
@@ -13,6 +14,7 @@ void style_panel(lv_obj_t *obj) {
   lv_obj_set_style_border_width(obj, 0, 0);
   lv_obj_set_style_radius(obj, 0, 0);
   lv_obj_set_style_pad_all(obj, 12, 0);
+  lv_obj_clear_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
 }
 
 // ---------------- UI build ----------------
@@ -120,6 +122,7 @@ void buildUI() {
     lv_obj_remove_style_all(forecast_box[i]);
     lv_obj_set_size(forecast_box[i], 98, 92);
     lv_obj_set_pos(forecast_box[i], x, y);
+    lv_obj_clear_flag(forecast_box[i], LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(forecast_box[i], LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(forecast_box[i], 1, 0);
     lv_obj_set_style_border_color(forecast_box[i], lv_color_hex(0x666666), 0);
@@ -167,6 +170,7 @@ void buildUI() {
     lv_obj_remove_style_all(crypto_boxes[i]);
     lv_obj_set_size(crypto_boxes[i], BOX_W, BOX_H);
     lv_obj_set_pos(crypto_boxes[i], CRYPTO_BOX_X, CRYPTO_ROW_BOX_Y[i]);
+    lv_obj_clear_flag(crypto_boxes[i], LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(crypto_boxes[i], LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(crypto_boxes[i], 1, 0);
     lv_obj_set_style_border_color(crypto_boxes[i], lv_color_hex(0x666666), 0);

@@ -47,8 +47,16 @@ void showPage(int page) {
 }
 
 // ---------------- Tap ----------------
+void showNextPageFromTouch() {
+  if (currentPage == 0) showPage(1);
+  else if (currentPage == 1) showPage(2);
+  else showPage(0);
+}
+
 void handleTapToggle() {
-  if (!ts.touched()) {
+  int x = 0;
+  int y = 0;
+  if (!readMappedTouch(x, y)) {
     if (!touchDown) return;
 
     int dx = abs(touchCurrentX - touchDownX);
@@ -65,9 +73,7 @@ void handleTapToggle() {
 #if TOUCH_DEBUG
       Serial.println("Tap debug: accepted");
 #endif
-      if (currentPage == 0) showPage(1);
-      else if (currentPage == 1) showPage(2);
-      else showPage(0);
+      showNextPageFromTouch();
     } else {
 #if TOUCH_DEBUG
       Serial.println("Tap debug: rejected");
@@ -79,13 +85,6 @@ void handleTapToggle() {
     return;
   }
 
-  TS_Point p = ts.getPoint();
-  int x = map(p.x, touchMinX, touchMaxX, screenWidth - 1, 0);
-  int y = map(p.y, touchMinY, touchMaxY, screenHeight - 1, 0);
-
-  x = constrain(x, 0, screenWidth - 1);
-  y = constrain(y, 0, screenHeight - 1);
-
   if (!touchDown) {
     touchDown = true;
     touchNavigatedOnPress = false;
@@ -95,6 +94,8 @@ void handleTapToggle() {
     touchCurrentY = y;
     touchDownMs = millis();
 
+    showNextPageFromTouch();
+    touchNavigatedOnPress = true;
     return;
   }
 

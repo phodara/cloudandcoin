@@ -12,27 +12,43 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 }
 
 // ---------------- Touch read ----------------
-void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
-  (void)indev_driver;
-
+bool readMappedTouch(int &x, int &y, int *pressure = nullptr) {
   if (!ts.touched()) {
-    data->state = LV_INDEV_STATE_REL;
-    return;
+    if (pressure) *pressure = 0;
+    return false;
   }
 
   TS_Point p = ts.getPoint();
+  if (pressure) *pressure = p.z;
+  if (p.z < touchPressureMin) return false;
 
-  int x = map(p.x, touchMinX, touchMaxX, screenWidth - 1, 0);
-  int y = map(p.y, touchMinY, touchMaxY, screenHeight - 1, 0);
+  x = map(p.x, touchMinX, touchMaxX, screenWidth - 1, 0);
+  y = map(p.y, touchMinY, touchMaxY, screenHeight - 1, 0);
+  x = constrain(x, 0, screenWidth - 1);
+  y = constrain(y, 0, screenHeight - 1);
+  return true;
+}
 
-  data->state = LV_INDEV_STATE_PR;
-  data->point.x = constrain(x, 0, screenWidth - 1);
-  data->point.y = constrain(y, 0, screenHeight - 1);
+void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
+  (void)indev_driver;
+
+  int x = 0;
+  int y = 0;
+  if (readMappedTouch(x, y)) {
+    data->state = LV_INDEV_STATE_PR;
+    data->point.x = x;
+    data->point.y = y;
+  } else {
+    data->state = LV_INDEV_STATE_REL;
+  }
 }
 
 void logTouchDebug() {
 #if TOUCH_DEBUG
-  if (!ts.touched()) {
+  int x = 0;
+  int y = 0;
+  int pressure = 0;
+  if (!readMappedTouch(x, y, &pressure)) {
     if (touchDebugWasDown) {
       Serial.println("Touch debug: released");
       touchDebugWasDown = false;
@@ -40,15 +56,7 @@ void logTouchDebug() {
     return;
   }
 
-  TS_Point p = ts.getPoint();
-  int x = map(p.x, touchMinX, touchMaxX, screenWidth - 1, 0);
-  int y = map(p.y, touchMinY, touchMaxY, screenHeight - 1, 0);
-
-  x = constrain(x, 0, screenWidth - 1);
-  y = constrain(y, 0, screenHeight - 1);
-
-  Serial.printf("Touch debug: raw(%d,%d,%d) mapped(%d,%d)\n", p.x, p.y, p.z, x, y);
+  Serial.printf("Touch debug: pressure=%d mapped(%d,%d)\n", pressure, x, y);
   touchDebugWasDown = true;
 #endif
 }
-
