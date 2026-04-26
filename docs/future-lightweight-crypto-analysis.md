@@ -13,6 +13,95 @@ Add simple, explainable signals that reuse data the firmware already has:
 
 The best additions should be cheap to compute, easy to display, and clear that they are signals or context, not trade instructions.
 
+## Current Trading Signals Module
+
+The firmware includes an optional lightweight trading signal screen implemented in:
+
+- `src/app/trading_signal.inc`
+
+It is designed as an informational scorecard. It does not place trades, call exchange APIs, or attempt to predict future price movement. It summarizes recent trend and momentum conditions using data already fetched by the device.
+
+### Enable Or Disable
+
+The module is controlled from `src/main.cpp`:
+
+```cpp
+#define ENABLE_TRADING_SIGNALS 1
+```
+
+Set it to `0` to remove the fourth `Signals` screen from the build:
+
+```cpp
+#define ENABLE_TRADING_SIGNALS 0
+```
+
+When enabled, the page flow is:
+
+```text
+Weather -> Crypto -> Pair Trading -> Signals -> Weather
+```
+
+When disabled, the app returns to the three-screen flow.
+
+### Data Used
+
+The signal module reuses existing in-memory data:
+
+- current crypto prices
+- 30-day price history
+- configured ticker symbols from `/crypto_tickers.txt`
+
+It does not add network requests or fetch extra history.
+
+### Lightweight Checks
+
+Each crypto receives a composite score. Bullish checks add points. Bearish checks subtract points.
+
+- `+1` if current price is above the 7-day average
+- `-1` if current price is below the 7-day average
+- `+1` if the 14-day average is above the 30-day average
+- `-1` if the 14-day average is below the 30-day average
+- `+1` if the 30-day return is greater than `+5%`
+- `-1` if the 30-day return is less than `-5%`
+- `+1` if the latest price move is greater than `+2%`
+- `-1` if the latest price move is less than `-2%`
+- `+1` if price is near the 30-day high
+- `-1` if price is near the 30-day low
+
+The displayed number is the final composite score. For example:
+
+```text
+BTC BUY +4  Near 30d high
+```
+
+means the bullish checks outnumber bearish checks by four points.
+
+### Labels
+
+The score maps to short device-friendly labels:
+
+```text
++3 or higher  BUY
++1 to +2      WATCH
+0             HOLD
+-1 to -2      WATCH
+-3 or lower   SELL
+```
+
+`WAIT` is shown when price or history data is missing.
+
+### Resource Profile
+
+The module is intentionally small:
+
+- no additional API calls
+- no extra JSON parsing
+- no additional historical buffers
+- four compact rows on the device
+- recalculates only from existing price/history state
+
+This keeps it suitable for the ESP32 while flash space remains the tighter constraint.
+
 ## Recommended First Additions
 
 ### 1. Volatility Score

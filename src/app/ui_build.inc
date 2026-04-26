@@ -52,7 +52,7 @@ void buildUI() {
   lv_label_set_text(memory_label, "Mem ...");
   lv_obj_set_style_text_font(memory_label, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(memory_label, lv_color_hex(0xAAAAAA), 0);
-  lv_obj_set_width(memory_label, 150);
+  lv_obj_set_width(memory_label, 260);
   lv_label_set_long_mode(memory_label, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_align(memory_label, LV_TEXT_ALIGN_LEFT, 0);
   lv_obj_set_pos(memory_label, 204, 298);
@@ -198,6 +198,31 @@ void buildUI() {
     lv_obj_set_style_text_color(pair_value_labels[i], lv_color_hex(0xCCCCCC), 0);
     lv_obj_set_pos(pair_value_labels[i], 0, 24 + (i * 48));
   }
+
+#if ENABLE_TRADING_SIGNALS
+  // Trading signals page
+  signal_page = lv_obj_create(scr);
+  lv_obj_set_size(signal_page, PAGE_W, PAGE_H);
+  lv_obj_set_pos(signal_page, PAGE_X, PAGE_Y);
+  style_panel(signal_page);
+
+  signal_title_label = lv_label_create(scr);
+  lv_label_set_text(signal_title_label, "Signals");
+  lv_obj_set_style_text_font(signal_title_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(signal_title_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_align(signal_title_label, LV_ALIGN_TOP_MID, 0, 12);
+  lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+
+  for (int i = 0; i < SIGNAL_VISIBLE_ROWS; i++) {
+    signal_value_labels[i] = lv_label_create(signal_page);
+    lv_label_set_text(signal_value_labels[i], "--");
+    lv_obj_set_width(signal_value_labels[i], PAGE_W - 24);
+    lv_label_set_long_mode(signal_value_labels[i], LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(signal_value_labels[i], &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(signal_value_labels[i], lv_color_hex(0xCCCCCC), 0);
+    lv_obj_set_pos(signal_value_labels[i], 0, 24 + (i * 48));
+  }
+#endif
 
   showPage(0);
 }

@@ -340,12 +340,17 @@ String formatMemoryText() {
   uint32_t freeHeap = ESP.getFreeHeap();
   uint32_t usedHeap = heapSize > freeHeap ? heapSize - freeHeap : 0;
   int usedPercent = heapSize > 0 ? (int)roundf(((float)usedHeap * 100.0f) / (float)heapSize) : 0;
+  uint32_t sketchSize = ESP.getSketchSize();
+  const esp_partition_t *runningPartition = esp_ota_get_running_partition();
+  uint32_t sketchTotal = runningPartition ? runningPartition->size : 0;
+  int flashPercent = sketchTotal > 0 ? (int)roundf(((float)sketchSize * 100.0f) / (float)sketchTotal) : 0;
 
   char text[48];
-  snprintf(text, sizeof(text), "%d%%  %lu/%lu KB",
+  snprintf(text, sizeof(text), "%d%% %lu/%luKB F%d%%",
            usedPercent,
            (unsigned long)(usedHeap / 1024),
-           (unsigned long)(heapSize / 1024));
+           (unsigned long)(heapSize / 1024),
+           flashPercent);
   return String(text);
 }
 

@@ -9,6 +9,10 @@ void showPage(int page) {
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
     lv_obj_invalidate(weather_page);
     weatherBadgesDirty = true;
   } else if (currentPage == 1) {
@@ -18,6 +22,10 @@ void showPage(int page) {
     lv_obj_clear_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
     lv_obj_invalidate(crypto_page);
     cryptoScrollOffset = 0;
     lastCryptoScrollMs = millis();
@@ -27,17 +35,36 @@ void showPage(int page) {
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
     else cryptoHistoryRefreshPending = false;
     cryptoSparklinesDirty = true;
-  } else {
+  } else if (currentPage == 2) {
     lv_obj_clear_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
     lv_obj_invalidate(pair_page);
     pairTradingDirty = true;
     pairTradingRender();
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
+#if ENABLE_TRADING_SIGNALS
+  } else {
+    lv_obj_clear_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_invalidate(signal_page);
+    tradingSignalsDirty = true;
+    tradingSignalsRender();
+    if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
+#endif
   }
 
   lv_refr_now(nullptr);
@@ -50,6 +77,9 @@ void showPage(int page) {
 void showNextPageFromTouch() {
   if (currentPage == 0) showPage(1);
   else if (currentPage == 1) showPage(2);
+#if ENABLE_TRADING_SIGNALS
+  else if (currentPage == 2) showPage(3);
+#endif
   else showPage(0);
 }
 
@@ -511,6 +541,7 @@ void updateHistorySparklines() {
   lastHistoryRefresh = millis();
   cryptoSparklinesDirty = true;
   pairTradingDirty = true;
+  tradingSignalsDirty = true;
 }
 
 void startCryptoHistoryRefresh() {
@@ -520,6 +551,7 @@ void startCryptoHistoryRefresh() {
   lastCryptoHistoryStepMs = 0;
   nextCryptoHistoryRetryMs = 0;
   pairTradingDirty = true;
+  tradingSignalsDirty = true;
 }
 
 void stepCryptoHistoryRefresh() {
@@ -548,6 +580,7 @@ void stepCryptoHistoryRefresh() {
     cryptoHistoryRetryMissingOnly = false;
     lastHistoryRefresh = millis();
     pairTradingDirty = true;
+    tradingSignalsDirty = true;
     if (currentPage == 1) set_status("Updated");
     return;
   }
@@ -560,6 +593,7 @@ void stepCryptoHistoryRefresh() {
   if (ok || !*cryptoHistoryOkAt(i)) *cryptoHistoryOkAt(i) = ok;
   cryptoSparklinesDirty = true;
   pairTradingDirty = true;
+  tradingSignalsDirty = true;
   lastCryptoHistoryStepMs = now;
   cryptoHistoryRefreshIndex++;
 
@@ -570,6 +604,7 @@ void stepCryptoHistoryRefresh() {
       cryptoHistoryRetryMissingOnly = false;
       lastHistoryRefresh = millis();
       pairTradingDirty = true;
+      tradingSignalsDirty = true;
       if (currentPage == 1) set_status("Updated");
     } else {
       cryptoHistoryRetryMissingOnly = true;
@@ -616,8 +651,14 @@ void showSetupInstructions() {
   lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+  lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+#endif
   lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+  lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
   lv_refr_now(nullptr);
 }

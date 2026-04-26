@@ -9,6 +9,8 @@
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 #include <lvgl.h>
+#include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -40,6 +42,10 @@
 #define BATTERY_MAX_V          4.20f
 #define BATTERY_SAMPLE_COUNT   8
 #define BATTERY_UPDATE_MS      10000UL
+
+// ---------------- Trading signals ----------------
+// Informational only. Disable to return to the three-screen app.
+#define ENABLE_TRADING_SIGNALS 1
 
 // ---------------- WiFi ----------------
 const char* DEFAULT_WIFI_SSID = SECRET_SSID;
@@ -113,9 +119,10 @@ const char* CRYPTO_TICKERS_PATH = "/crypto_tickers.txt";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = pair trading
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = pair trading, 3 = signals
 bool cryptoSparklinesDirty = true;
 bool pairTradingDirty = true;
+bool tradingSignalsDirty = true;
 bool weatherBadgesDirty = true;
 bool cryptoRefreshPending = false;
 bool cryptoWebRefreshPending = false;
@@ -130,6 +137,7 @@ const int HISTORY_POINTS = 30;
 const int MAX_ACTIVE_CRYPTO_COUNT = 10;
 const int CRYPTO_VISIBLE_ROWS = 4;
 const int PAIR_VISIBLE_ROWS = 4;
+const int SIGNAL_VISIBLE_ROWS = 4;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
 const unsigned long CRYPTO_HISTORY_STEP_INTERVAL_MS = 3000UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
@@ -203,11 +211,13 @@ lv_obj_t *memory_label;
 lv_obj_t *weather_page;
 lv_obj_t *crypto_page;
 lv_obj_t *pair_page;
+lv_obj_t *signal_page;
 lv_obj_t *setup_page;
 lv_obj_t *setup_message_label;
 
 lv_obj_t *weather_title_label;
 lv_obj_t *pair_title_label;
+lv_obj_t *signal_title_label;
 lv_obj_t *weather_temp_label;
 lv_obj_t *weather_cond_label;
 lv_obj_t *weather_hi_label;
@@ -221,6 +231,7 @@ lv_obj_t *forecast_cond_label[4];
 lv_obj_t *crypto_title_label;
 lv_obj_t *crypto_value_labels[CRYPTO_VISIBLE_ROWS];
 lv_obj_t *pair_value_labels[PAIR_VISIBLE_ROWS];
+lv_obj_t *signal_value_labels[SIGNAL_VISIBLE_ROWS];
 
 // Sparkline boxes
 lv_obj_t *crypto_boxes[CRYPTO_VISIBLE_ROWS];
@@ -392,9 +403,11 @@ void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
 void drawCryptoSparklines();
 void pairTradingRender();
+void tradingSignalsRender();
 
 #include "app/helpers.inc"
 #include "app/pair_trading.inc"
+#include "app/trading_signal.inc"
 #include "app/web.inc"
 #include "app/display_touch.inc"
 #include "app/crypto_data.inc"
@@ -518,26 +531,30 @@ void loop() {
     lastWeatherRefresh = millis();
   }
 
-  if ((currentPage == 1 || currentPage == 2) && cryptoRefreshPending) {
+  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
     set_status("Updating...");
     updateCrypto();
     pairTradingDirty = true;
+    tradingSignalsDirty = true;
     if (currentPage == 2) pairTradingRender();
+    if (currentPage == 3) tradingSignalsRender();
     set_status("Updated");
     lastCryptoPriceRefresh = millis();
     cryptoRefreshPending = false;
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
   }
 
-  if ((currentPage == 1 || currentPage == 2) && cryptoHistoryRefreshPending) {
+  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
 
-  if ((currentPage == 1 || currentPage == 2) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
+  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
     set_status("Updating...");
     updateCrypto();
     pairTradingDirty = true;
+    tradingSignalsDirty = true;
     if (currentPage == 2) pairTradingRender();
+    if (currentPage == 3) tradingSignalsRender();
     set_status("Updated");
     lastCryptoPriceRefresh = millis();
   }
@@ -545,6 +562,7 @@ void loop() {
   if (currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
     updateCrypto();
     pairTradingDirty = true;
+    tradingSignalsDirty = true;
     lastCryptoPriceRefresh = millis();
   }
 
@@ -559,6 +577,10 @@ void loop() {
 
   if (pairTradingDirty && currentPage == 2) {
     pairTradingRender();
+  }
+
+  if (tradingSignalsDirty && currentPage == 3) {
+    tradingSignalsRender();
   }
 
   if (weatherBadgesDirty && currentPage == 0) {

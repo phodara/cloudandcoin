@@ -173,6 +173,7 @@ void loadCryptoConfigurationFromSD() {
   configuredCryptoCount = selectedCount;
   cryptoScrollOffset = 0;
   pairTradingDirty = true;
+  tradingSignalsDirty = true;
 }
 
 // ---------------- CoinGecko history ----------------
