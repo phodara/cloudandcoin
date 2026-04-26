@@ -393,11 +393,11 @@ void drawCryptoSparklines();
 void pairTradingRender();
 
 #include "app/helpers.inc"
+#include "app/pair_trading.inc"
 #include "app/web.inc"
 #include "app/display_touch.inc"
 #include "app/crypto_data.inc"
 #include "app/weather_data.inc"
-#include "app/pair_trading.inc"
 #include "app/runtime_ui.inc"
 #include "app/ui_build.inc"
 // ---------------- WiFi ----------------

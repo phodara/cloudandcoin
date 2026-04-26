@@ -38,6 +38,8 @@ Future larger-list design notes are captured in [`future-crypto-scaling.md`](fut
 
 Future pair-trading screen notes are captured in [`future-pair-trading.md`](future-pair-trading.md).
 
+Future lightweight crypto analysis ideas are captured in [`future-lightweight-crypto-analysis.md`](future-lightweight-crypto-analysis.md).
+
 ## Web Interface
 
 - `http://cloudandcoin.local/`

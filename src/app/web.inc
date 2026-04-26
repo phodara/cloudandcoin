@@ -399,7 +399,7 @@ void handleRemoteViewRoot() {
   }
 
   String body;
-  body.reserve(18000);
+  body.reserve(22000);
   body += "<!doctype html><html><head><meta charset=\"utf-8\">";
   body += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   body += "<meta http-equiv=\"refresh\" content=\"";
@@ -416,7 +416,9 @@ void handleRemoteViewRoot() {
   body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
   body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
   body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
+  body += ".pair-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair-name{font-weight:700}.pair-signal{font-weight:700}.pair-bias{text-align:right}.strong{color:var(--green)}.med{color:var(--gold)}.weak{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
   body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
+  body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
   body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
@@ -508,7 +510,44 @@ void handleRemoteViewRoot() {
     body += cryptoDirectionText(currentCryptoValues[i], previousCryptoValues[i]);
     body += "</div></div>";
   }
-  body += "</div></section></div></div></body></html>";
+  body += "</div></section>";
+
+  pairTradingComputeCandidates();
+  body += "<section class=\"screen\"><h2>Pair Trading</h2><div class=\"pair-list\">";
+  if (configuredCryptoCount < 2) {
+    body += "<div class=\"empty\">Add at least two crypto tickers to generate dynamic pair candidates.</div>";
+  } else if (pairTradingCandidateCount == 0) {
+    body += "<div class=\"empty\">Waiting for crypto history data before ranking pairs.</div>";
+  } else {
+    for (int i = 0; i < pairTradingCandidateCount; i++) {
+      PairTradingCandidate &candidate = pairTradingCandidates[i];
+      String signalClass = "weak";
+      if (strcmp(candidate.signal, "Strong") == 0) signalClass = "strong";
+      else if (strcmp(candidate.signal, "Med") == 0) signalClass = "med";
+
+      char zText[12];
+      char cText[12];
+      snprintf(zText, sizeof(zText), "%.1f", candidate.zScore);
+      snprintf(cText, sizeof(cText), "%.2f", candidate.correlation);
+
+      body += "<div class=\"pair\"><div class=\"pair-name\">";
+      body += htmlEscape(String(activeCryptos[candidate.a].symbol));
+      body += "/";
+      body += htmlEscape(String(activeCryptos[candidate.b].symbol));
+      body += "</div><div class=\"pair-signal ";
+      body += signalClass;
+      body += "\">";
+      body += htmlEscape(String(candidate.signal));
+      body += "</div><div>z ";
+      body += zText;
+      body += "</div><div>c ";
+      body += cText;
+      body += "</div><div class=\"pair-bias\">";
+      body += htmlEscape(String(candidate.bias));
+      body += "</div></div>";
+    }
+  }
+  body += "</div><p class=\"sub\">Signals are candidates based on recent correlation and ratio divergence, not trade instructions.</p></section></div></div></body></html>";
 
   webServer.send(200, "text/html", body);
 }
