@@ -5,6 +5,7 @@
 
 struct TradingSignalResult {
   int score;
+  float latestPrice;
   const char *action;
   const char *reason;
 };
@@ -56,13 +57,14 @@ bool tradingSignalRange(const float history[], float &low, float &high) {
 TradingSignalResult calculateTradingSignal(int index) {
   TradingSignalResult result;
   result.score = 0;
+  result.latestPrice = tradingSignalLatestPrice(index);
   result.action = "WAIT";
   result.reason = "Missing history";
 
   if (index < 0 || index >= configuredCryptoCount || !cryptoHistoryOk[index]) return result;
 
   const float *history = cryptoHistory[index];
-  float latest = tradingSignalLatestPrice(index);
+  float latest = result.latestPrice;
   if (isnan(latest) || latest <= 0.0f) {
     result.reason = "Missing price";
     return result;
@@ -161,12 +163,16 @@ void tradingSignalsRender() {
     }
 
     TradingSignalResult signal = calculateTradingSignal(i);
-    char text[96];
+    char priceText[24];
+    formatCryptoPriceText(signal.latestPrice, activeCryptos[i].decimals, priceText, sizeof(priceText));
+
+    char text[112];
     snprintf(
       text,
       sizeof(text),
-      "%s %s %+d  %s",
+      "%s %s %s %+d  %s",
       activeCryptos[i].symbol,
+      priceText,
       signal.action,
       signal.score,
       signal.reason
@@ -191,4 +197,3 @@ void tradingSignalsRender() {
 void tradingSignalsRender() {}
 
 #endif
-

@@ -141,6 +141,22 @@ int cryptoActiveIndexForSlot(int slot) {
   return (activeIndex >= 0 && activeIndex < configuredCryptoCount) ? activeIndex : -1;
 }
 
+void formatCryptoPriceText(float value, int decimals, char *out, size_t outSize) {
+  if (!out || outSize == 0) return;
+
+  if (isnan(value)) {
+    snprintf(out, outSize, "N/A");
+    return;
+  }
+
+  char priceBuf[24];
+  dtostrf(value, 0, decimals, priceBuf);
+  char *trimmed = priceBuf;
+  while (*trimmed == ' ') ++trimmed;
+
+  snprintf(out, outSize, "$%s", trimmed);
+}
+
 void copyText(char *dest, size_t destSize, const char *src, const char *fallback = "") {
   const char *text = (src && *src) ? src : fallback;
   snprintf(dest, destSize, "%s", text);
@@ -424,4 +440,3 @@ void loadDeviceConfigurationFromSD() {
     deviceConfig.timezone
   );
 }
-

@@ -367,16 +367,9 @@ String formatLocalTimeText() {
 }
 
 String formatCryptoPrice(float value, int decimals) {
-  if (isnan(value)) return "N/A";
-
-  char priceBuf[24];
-  dtostrf(value, 0, decimals, priceBuf);
-  char *trimmed = priceBuf;
-  while (*trimmed == ' ') ++trimmed;
-
-  String text = "$";
-  text += trimmed;
-  return text;
+  char text[24];
+  formatCryptoPriceText(value, decimals, text, sizeof(text));
+  return String(text);
 }
 
 String cryptoDirectionClass(float currentVal, float prevVal) {
@@ -421,9 +414,9 @@ void handleRemoteViewRoot() {
   body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
   body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
   body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
-  body += ".pair-list,.signal-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 72px 48px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-reason{color:var(--muted);text-align:right}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
+  body += ".pair-list,.signal-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 92px 72px 42px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-price{text-align:right}.sig-reason{color:var(--muted);text-align:right}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
   body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
-  body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 68px 42px 1fr}.sig-reason{text-align:left}}";
+  body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 88px 68px 42px}.sig-reason{grid-column:1/-1;text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
   body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
@@ -569,10 +562,14 @@ void handleRemoteViewRoot() {
       else if (strcmp(signal.action, "WAIT") == 0) actionClass = "wait";
 
       char scoreText[8];
+      char priceText[24];
       snprintf(scoreText, sizeof(scoreText), "%+d", signal.score);
+      formatCryptoPriceText(signal.latestPrice, activeCryptos[i].decimals, priceText, sizeof(priceText));
 
       body += "<div class=\"signal\"><div class=\"sig-symbol\">";
       body += htmlEscape(String(activeCryptos[i].symbol));
+      body += "</div><div class=\"sig-price\">";
+      body += htmlEscape(String(priceText));
       body += "</div><div class=\"sig-action ";
       body += actionClass;
       body += "\">";
