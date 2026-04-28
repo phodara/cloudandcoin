@@ -55,7 +55,7 @@ String editorChromeStart(const char *title, const char *subtitle) {
   body += "</p>";
   if (!setupModeActive) {
     body += "<div class=\"nav\">";
-    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
+    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
     body += "</div>";
   }
   return body;
@@ -144,6 +144,138 @@ void handleTickerEditorSave() {
   cryptoRefreshPending = true;
   startCryptoHistoryRefresh();
   sendTickerEditorPage("Saved. The ticker list reloaded. Prices and history will refresh in the background.", true);
+}
+
+void appendTickerLookupResults(String& body, const String& query, int decimals) {
+  if (query.length() == 0) return;
+
+  if (WiFi.status() != WL_CONNECTED) {
+    body += "<div class=\"msg err\">Wi-Fi is disconnected, so CoinGecko lookup is unavailable.</div>";
+    return;
+  }
+
+  HTTPClient http;
+  http.setConnectTimeout(5000);
+  http.setTimeout(8000);
+
+  String url = "https://api.coingecko.com/api/v3/search?query=";
+  url += urlEncode(query.c_str());
+
+  if (!http.begin(url)) {
+    body += "<div class=\"msg err\">CoinGecko lookup could not start.</div>";
+    return;
+  }
+
+  int code = http.GET();
+  if (code != 200) {
+    http.end();
+    body += "<div class=\"msg err\">CoinGecko lookup failed with HTTP ";
+    body += String(code);
+    body += ".</div>";
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+  DynamicJsonDocument filter(768);
+  filter["coins"][0]["id"] = true;
+  filter["coins"][0]["name"] = true;
+  filter["coins"][0]["symbol"] = true;
+  filter["coins"][0]["market_cap_rank"] = true;
+
+  DynamicJsonDocument doc(8192);
+  DeserializationError err = deserializeJson(doc, payload, DeserializationOption::Filter(filter));
+  if (err) {
+    body += "<div class=\"msg err\">CoinGecko response could not be parsed.</div>";
+    return;
+  }
+
+  JsonArray coins = doc["coins"].as<JsonArray>();
+  if (coins.isNull() || coins.size() == 0) {
+    body += "<div class=\"msg err\">No CoinGecko coin matches found.</div>";
+    return;
+  }
+
+  body += "<div class=\"section\"><h2>Ready Lines</h2>";
+  body += "<p>Copy the matching line into <code>/crypto_tickers.txt</code>.</p>";
+  body += "<textarea readonly spellcheck=\"false\" style=\"min-height:180px;\">";
+
+  int rendered = 0;
+  for (JsonObject coin : coins) {
+    if (rendered >= 12) break;
+
+    const char *id = coin["id"] | "";
+    const char *symbol = coin["symbol"] | "";
+    if (!id || !*id || !symbol || !*symbol) continue;
+
+    String displaySymbol = String(symbol);
+    displaySymbol.toUpperCase();
+
+    body += htmlEscape(displaySymbol);
+    body += "|";
+    body += htmlEscape(String(id));
+    body += "|";
+    body += String(decimals);
+    body += "\n";
+    rendered++;
+  }
+  body += "</textarea></div>";
+
+  body += "<div class=\"section\"><h2>Matches</h2><div class=\"meta\">";
+  rendered = 0;
+  for (JsonObject coin : coins) {
+    if (rendered >= 12) break;
+
+    const char *id = coin["id"] | "";
+    const char *name = coin["name"] | "";
+    const char *symbol = coin["symbol"] | "";
+    if (!id || !*id || !symbol || !*symbol) continue;
+
+    String displaySymbol = String(symbol);
+    displaySymbol.toUpperCase();
+    int rank = coin["market_cap_rank"] | 0;
+
+    body += "<p><code>";
+    body += htmlEscape(displaySymbol);
+    body += "|";
+    body += htmlEscape(String(id));
+    body += "|";
+    body += String(decimals);
+    body += "</code> ";
+    body += htmlEscape(String(name));
+    if (rank > 0) {
+      body += " rank ";
+      body += String(rank);
+    }
+    body += "</p>";
+    rendered++;
+  }
+  body += "</div></div>";
+}
+
+void handleTickerLookupRoot() {
+  if (!ensureWebAuthorized()) return;
+
+  String query = webServer.arg("q");
+  query.trim();
+  int decimals = webServer.hasArg("decimals") ? webServer.arg("decimals").toInt() : 4;
+  if (decimals < 0) decimals = 0;
+  if (decimals > 8) decimals = 8;
+
+  String body = editorChromeStart("Ticker Lookup", "Search CoinGecko and generate ready-to-paste ticker lines.");
+  body += "<form method=\"GET\" action=\"/lookup\">";
+  body += "<label for=\"q\">Ticker or coin name</label><input id=\"q\" name=\"q\" value=\"";
+  body += htmlEscape(query);
+  body += "\" placeholder=\"XCN\">";
+  body += "<label for=\"decimals\">Decimals</label><input id=\"decimals\" name=\"decimals\" type=\"number\" min=\"0\" max=\"8\" value=\"";
+  body += String(decimals);
+  body += "\">";
+  body += "<br><button type=\"submit\">Look Up Ticker</button></form>";
+  appendTickerLookupResults(body, query, decimals);
+  body += "</div></div></body></html>";
+
+  webServer.send(200, "text/html", body);
 }
 
 void sendSecretsEditorPage(const char *message, bool success) {
@@ -419,7 +551,7 @@ void handleRemoteViewRoot() {
   body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 88px 68px 42px}.sig-reason{grid-column:1/-1;text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
-  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
+  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
 
   body += "<div class=\"status\"><div class=\"pill\"><b>Battery</b><span>";
   body += htmlEscape(formatBatteryText());
@@ -648,6 +780,7 @@ void startWebEditor() {
     webServer.on("/", HTTP_GET, handleRemoteViewRoot);
     webServer.on("/tickers", HTTP_GET, handleTickerEditorRoot);
     webServer.on("/tickers/save", HTTP_POST, handleTickerEditorSave);
+    webServer.on("/lookup", HTTP_GET, handleTickerLookupRoot);
     webServer.on("/secrets", HTTP_GET, handleSecretsEditorRoot);
     webServer.on("/secrets/save", HTTP_POST, handleSecretsEditorSave);
     webServer.on("/secrets/save-reboot", HTTP_POST, handleSecretsSaveAndReboot);

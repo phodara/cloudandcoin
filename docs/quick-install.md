@@ -142,6 +142,7 @@ After the device is online:
 - `http://cloudandcoin.local/` opens the live web view
 - `http://cloudandcoin.local/view` opens the live web view
 - `http://cloudandcoin.local/tickers` edits `/crypto_tickers.txt`
+- `http://cloudandcoin.local/lookup` searches CoinGecko and generates ticker lines
 - `http://cloudandcoin.local/secrets` edits `/secrets.txt`
 - `http://cloudandcoin.local/info` shows repository, license, notice, and contribution details
 
