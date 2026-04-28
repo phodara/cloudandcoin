@@ -53,10 +53,21 @@ void logTouchDebug() {
       Serial.println("Touch debug: released");
       touchDebugWasDown = false;
     }
+    lastTouchDebugMs = 0;
     return;
   }
 
-  Serial.printf("Touch debug: pressure=%d mapped(%d,%d)\n", pressure, x, y);
+  unsigned long now = millis();
+  if (!touchDebugWasDown || now - lastTouchDebugMs >= 250) {
+    Serial.printf(
+      "Touch debug: %s pressure=%d mapped(%d,%d)\n",
+      touchDebugWasDown ? "held" : "pressed",
+      pressure,
+      x,
+      y
+    );
+    lastTouchDebugMs = now;
+  }
   touchDebugWasDown = true;
 #endif
 }

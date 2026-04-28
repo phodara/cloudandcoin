@@ -28,7 +28,7 @@
 #define SD_SCK_PIN    18
 #define SD_MISO_PIN   19
 #define SD_MOSI_PIN   23
-#define TOUCH_DEBUG   0
+#define TOUCH_DEBUG   1
 
 // ---------------- Battery monitor ----------------
 // This block is intentionally self-contained so it is easy to disable or remove.
@@ -111,6 +111,9 @@ const int tapMoveThreshold = 20;
 const unsigned long tapMinMs = 0;
 const unsigned long tapMaxMs = 800;
 bool touchDebugWasDown = false;
+unsigned long lastTouchDebugMs = 0;
+unsigned long lastTouchInteractionMs = 0;
+const unsigned long touchNetworkSettleMs = 750;
 
 // ---------------- Trend memory ----------------
 float prevWeatherPressure = NAN;
@@ -459,6 +462,7 @@ void setup() {
 
   SPI.begin(14, 12, 13);
   ts.begin();
+  SPI.begin(14, 12, 13);
   ts.setRotation(1);
 
   lv_init();
@@ -519,6 +523,8 @@ void loop() {
 
   if (setupModeActive) return;
 
+  bool touchSettledForNetwork = millis() - lastTouchInteractionMs >= touchNetworkSettleMs;
+
   if (cryptoWebRefreshPending) {
     updateCrypto();
     lastCryptoPriceRefresh = millis();
@@ -526,12 +532,12 @@ void loop() {
     cryptoWebRefreshPending = false;
   }
 
-  if (millis() - lastWeatherRefresh >= weatherRefreshIntervalMs) {
+  if (touchSettledForNetwork && millis() - lastWeatherRefresh >= weatherRefreshIntervalMs) {
     refreshAll(currentPage == 0);
     lastWeatherRefresh = millis();
   }
 
-  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
+  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
     set_status("Updating...");
     updateCrypto();
     pairTradingDirty = true;
@@ -544,11 +550,11 @@ void loop() {
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
   }
 
-  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoHistoryRefreshPending) {
+  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
 
-  if ((currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
+  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
     set_status("Updating...");
     updateCrypto();
     pairTradingDirty = true;
@@ -559,7 +565,7 @@ void loop() {
     lastCryptoPriceRefresh = millis();
   }
 
-  if (currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
+  if (touchSettledForNetwork && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
     updateCrypto();
     pairTradingDirty = true;
     tradingSignalsDirty = true;

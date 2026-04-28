@@ -75,6 +75,7 @@ void showPage(int page) {
 
 // ---------------- Tap ----------------
 void showNextPageFromTouch() {
+  lastTouchInteractionMs = millis();
   if (currentPage == 0) showPage(1);
   else if (currentPage == 1) showPage(2);
 #if ENABLE_TRADING_SIGNALS
@@ -84,9 +85,11 @@ void showNextPageFromTouch() {
 }
 
 void handleTapToggle() {
+  bool touchActive = false;
   int x = 0;
   int y = 0;
-  if (!readMappedTouch(x, y)) {
+  touchActive = readMappedTouch(x, y);
+  if (!touchActive) {
     if (!touchDown) return;
 
     int dx = abs(touchCurrentX - touchDownX);
@@ -97,8 +100,11 @@ void handleTapToggle() {
     Serial.printf("Tap debug: dx=%d dy=%d pressMs=%lu\n", dx, dy, pressMs);
 #endif
 
-    if (!touchNavigatedOnPress &&
-        dx <= tapMoveThreshold && dy <= tapMoveThreshold &&
+    if (touchNavigatedOnPress) {
+#if TOUCH_DEBUG
+      Serial.println("Tap debug: already handled on press");
+#endif
+    } else if (dx <= tapMoveThreshold && dy <= tapMoveThreshold &&
         pressMs >= tapMinMs && pressMs <= tapMaxMs) {
 #if TOUCH_DEBUG
       Serial.println("Tap debug: accepted");
@@ -112,9 +118,11 @@ void handleTapToggle() {
 
     touchDown = false;
     touchNavigatedOnPress = false;
+    lastTouchInteractionMs = millis();
     return;
   }
 
+  lastTouchInteractionMs = millis();
   if (!touchDown) {
     touchDown = true;
     touchNavigatedOnPress = false;
