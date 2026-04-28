@@ -103,8 +103,6 @@ void updateBatteryStatus(bool force) {
     lv_label_set_text(memory_label, memoryText.c_str());
   }
 
-  Serial.printf("Battery: raw=%d adc=%dmV pack=%.2fV percent=%d%%\n",
-                lastBatteryRaw, lastBatteryAdcMv, lastBatteryVoltage, lastBatteryPercent);
 }
 
 bool containsIgnoreCase(const char *haystack, const char *needle) {
