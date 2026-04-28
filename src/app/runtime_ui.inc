@@ -30,7 +30,7 @@ void showPage(int page) {
     cryptoScrollOffset = 0;
     lastCryptoScrollMs = millis();
     renderCryptoWindow();
-    set_status("Updating...");
+    set_status("Crypto updating");
     cryptoRefreshPending = true;
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
     else cryptoHistoryRefreshPending = false;
@@ -333,6 +333,221 @@ void updateCrypto() {
   renderCryptoWindow();
 }
 
+// ---------------- Background data worker ----------------
+void dataWorkerTask(void *param) {
+  (void)param;
+
+  for (;;) {
+    DataJob job;
+    if (xQueueReceive(dataJobQueue, &job, portMAX_DELAY) != pdTRUE) continue;
+
+    if (job.type == DATA_JOB_CRYPTO_PRICES) {
+      float latestValues[MAX_ACTIVE_CRYPTO_COUNT];
+      bool ok = fetchCurrentPricesUsd(latestValues, job.count);
+
+      if (xSemaphoreTake(dataWorkerMutex, portMAX_DELAY) == pdTRUE) {
+        int count = job.count;
+        if (count < 0) count = 0;
+        if (count > MAX_ACTIVE_CRYPTO_COUNT) count = MAX_ACTIVE_CRYPTO_COUNT;
+        stagedCryptoPriceCount = count;
+        for (int i = 0; i < count; i++) stagedCryptoValues[i] = latestValues[i];
+        cryptoPriceResultOk = ok;
+        cryptoPriceResultReady = true;
+        xSemaphoreGive(dataWorkerMutex);
+      }
+    } else if (job.type == DATA_JOB_CRYPTO_HISTORY) {
+      float history[HISTORY_POINTS];
+      int count = 0;
+      bool ok = fetchHistory30(job.coinGeckoId, history, count);
+
+      if (xSemaphoreTake(dataWorkerMutex, portMAX_DELAY) == pdTRUE) {
+        stagedCryptoHistoryIndex = job.index;
+        stagedCryptoHistoryCount = count;
+        for (int i = 0; i < HISTORY_POINTS; i++) stagedCryptoHistory[i] = history[i];
+        cryptoHistoryResultOk = ok;
+        cryptoHistoryResultReady = true;
+        xSemaphoreGive(dataWorkerMutex);
+      }
+    }
+  }
+}
+
+void startDataWorker() {
+  if (dataJobQueue && dataWorkerMutex && dataWorkerTaskHandle) return;
+
+  dataWorkerMutex = xSemaphoreCreateMutex();
+  dataJobQueue = xQueueCreate(4, sizeof(DataJob));
+  if (!dataWorkerMutex || !dataJobQueue) {
+    Serial.println("Data worker: failed to allocate queue or mutex");
+    return;
+  }
+
+  BaseType_t ok = xTaskCreatePinnedToCore(
+    dataWorkerTask,
+    "data-worker",
+    8192,
+    nullptr,
+    1,
+    &dataWorkerTaskHandle,
+    0
+  );
+
+  if (ok != pdPASS) {
+    Serial.println("Data worker: task create failed");
+    dataWorkerTaskHandle = nullptr;
+  }
+}
+
+bool queueCryptoPriceRefresh() {
+  if (!dataJobQueue || !dataWorkerMutex) return false;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
+  bool alreadyBusy = cryptoPriceJobQueued || cryptoPriceResultReady;
+  if (!alreadyBusy) cryptoPriceJobQueued = true;
+  xSemaphoreGive(dataWorkerMutex);
+  if (alreadyBusy) return true;
+
+  DataJob job = {};
+  job.type = DATA_JOB_CRYPTO_PRICES;
+  job.count = configuredCryptoCount;
+  if (xQueueSendToFront(dataJobQueue, &job, 0) == pdTRUE) return true;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    cryptoPriceJobQueued = false;
+    xSemaphoreGive(dataWorkerMutex);
+  }
+  return false;
+}
+
+bool queueCryptoHistoryRefresh(int index) {
+  if (!dataJobQueue || !dataWorkerMutex) return false;
+  if (index < 0 || index >= configuredCryptoCount) return false;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
+  bool pricePending = cryptoPriceJobQueued || cryptoPriceResultReady;
+  bool alreadyBusy = pricePending || cryptoHistoryJobQueued || cryptoHistoryResultReady;
+  if (!alreadyBusy) cryptoHistoryJobQueued = true;
+  xSemaphoreGive(dataWorkerMutex);
+  if (alreadyBusy) return true;
+
+  DataJob job = {};
+  job.type = DATA_JOB_CRYPTO_HISTORY;
+  job.index = index;
+  snprintf(job.coinGeckoId, sizeof(job.coinGeckoId), "%s", activeCryptos[index].coinGeckoId);
+  if (xQueueSend(dataJobQueue, &job, 0) == pdTRUE) return true;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    cryptoHistoryJobQueued = false;
+    xSemaphoreGive(dataWorkerMutex);
+  }
+  return false;
+}
+
+bool dataWorkerBusy() {
+  if (!dataWorkerMutex) return false;
+  bool busy = false;
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    busy = cryptoPriceJobQueued || cryptoPriceResultReady ||
+           cryptoHistoryJobQueued || cryptoHistoryResultReady;
+    xSemaphoreGive(dataWorkerMutex);
+  }
+  return busy;
+}
+
+void finishCryptoHistoryStep() {
+  cryptoSparklinesDirty = true;
+  pairTradingDirty = true;
+  tradingSignalsDirty = true;
+  cryptoHistoryRefreshIndex++;
+
+  if (cryptoHistoryRefreshIndex >= configuredCryptoCount) {
+    if (allCryptoHistoryReady()) {
+      cryptoHistoryRefreshPending = false;
+      cryptoHistoryRefreshIndex = -1;
+      cryptoHistoryRetryMissingOnly = false;
+      lastHistoryRefresh = millis();
+      if (currentPage == 1) set_status("Updated");
+    } else {
+      cryptoHistoryRetryMissingOnly = true;
+      cryptoHistoryRefreshIndex = 0;
+      nextCryptoHistoryRetryMs = millis() + cryptoHistoryRetryIntervalMs;
+      if (currentPage == 1) set_status("Retry history...");
+    }
+  }
+}
+
+void applyDataWorkerResults() {
+  if (!dataWorkerMutex) return;
+
+  bool havePrice = false;
+  bool priceOk = false;
+  int priceCount = 0;
+  float priceValues[MAX_ACTIVE_CRYPTO_COUNT];
+  bool haveHistory = false;
+  bool historyOk = false;
+  int historyIndex = -1;
+  float historyValues[HISTORY_POINTS];
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
+
+  if (cryptoPriceResultReady) {
+    havePrice = true;
+    priceOk = cryptoPriceResultOk;
+    priceCount = stagedCryptoPriceCount;
+    if (priceCount > MAX_ACTIVE_CRYPTO_COUNT) priceCount = MAX_ACTIVE_CRYPTO_COUNT;
+    for (int i = 0; i < priceCount; i++) priceValues[i] = stagedCryptoValues[i];
+    cryptoPriceResultReady = false;
+    cryptoPriceJobQueued = false;
+  }
+
+  if (cryptoHistoryResultReady) {
+    haveHistory = true;
+    historyOk = cryptoHistoryResultOk;
+    historyIndex = stagedCryptoHistoryIndex;
+    for (int i = 0; i < HISTORY_POINTS; i++) historyValues[i] = stagedCryptoHistory[i];
+    cryptoHistoryResultReady = false;
+    cryptoHistoryJobQueued = false;
+  }
+
+  xSemaphoreGive(dataWorkerMutex);
+
+  if (havePrice) {
+    bool hasDisplayedPrice = false;
+    for (int i = 0; i < priceCount; i++) {
+      if (!isnan(priceValues[i])) {
+        previousCryptoValues[i] = currentCryptoValues[i];
+        currentCryptoValues[i] = priceValues[i];
+      }
+      if (!isnan(currentCryptoValues[i])) hasDisplayedPrice = true;
+    }
+    renderCryptoWindow();
+    pairTradingDirty = true;
+    tradingSignalsDirty = true;
+    if (currentPage == 2) pairTradingRender();
+    if (currentPage == 3) tradingSignalsRender();
+    if (priceOk) set_status("Updated");
+    else if (hasDisplayedPrice) set_status("Cached prices");
+    else set_status("No prices");
+  }
+
+  if (haveHistory && historyIndex >= 0 && historyIndex < configuredCryptoCount) {
+    if (historyOk) {
+      for (int i = 0; i < HISTORY_POINTS; i++) cryptoHistory[historyIndex][i] = historyValues[i];
+      if (isnan(previousCryptoValues[historyIndex]) && !isnan(currentCryptoValues[historyIndex])) {
+        for (int i = HISTORY_POINTS - 2; i >= 0; i--) {
+          if (!isnan(historyValues[i]) && historyValues[i] > 0.0f) {
+            previousCryptoValues[historyIndex] = historyValues[i];
+            break;
+          }
+        }
+      }
+    }
+    if (historyOk || !cryptoHistoryOk[historyIndex]) cryptoHistoryOk[historyIndex] = historyOk;
+    renderCryptoWindow();
+    finishCryptoHistoryStep();
+  }
+}
+
 void updateCryptoAutoScroll() {
   if (currentPage != 1 || !cryptoAutoScrollEnabled()) return;
 
@@ -595,32 +810,7 @@ void stepCryptoHistoryRefresh() {
 
   if (currentPage == 1) set_status("Loading history...");
 
-  int count = 0;
-  int i = cryptoHistoryRefreshIndex;
-  bool ok = fetchHistory30(activeCryptos[i].coinGeckoId, cryptoHistoryAt(i), count);
-  if (ok || !*cryptoHistoryOkAt(i)) *cryptoHistoryOkAt(i) = ok;
-  cryptoSparklinesDirty = true;
-  pairTradingDirty = true;
-  tradingSignalsDirty = true;
-  lastCryptoHistoryStepMs = now;
-  cryptoHistoryRefreshIndex++;
-
-  if (cryptoHistoryRefreshIndex >= configuredCryptoCount) {
-    if (allCryptoHistoryReady()) {
-      cryptoHistoryRefreshPending = false;
-      cryptoHistoryRefreshIndex = -1;
-      cryptoHistoryRetryMissingOnly = false;
-      lastHistoryRefresh = millis();
-      pairTradingDirty = true;
-      tradingSignalsDirty = true;
-      if (currentPage == 1) set_status("Updated");
-    } else {
-      cryptoHistoryRetryMissingOnly = true;
-      cryptoHistoryRefreshIndex = 0;
-      nextCryptoHistoryRetryMs = millis() + cryptoHistoryRetryIntervalMs;
-      if (currentPage == 1) set_status("Retry history...");
-    }
-  }
+  if (queueCryptoHistoryRefresh(cryptoHistoryRefreshIndex)) lastCryptoHistoryStepMs = now;
 }
 
 void refreshAll(bool announceStatus) {

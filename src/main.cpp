@@ -11,6 +11,10 @@
 #include <lvgl.h>
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
@@ -150,6 +154,34 @@ float previousCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
 int configuredCryptoCount = 4;
 int cryptoScrollOffset = 0;
 unsigned long lastCryptoScrollMs = 0;
+
+// ---------------- Background data worker ----------------
+enum DataJobType : uint8_t {
+  DATA_JOB_CRYPTO_PRICES = 1,
+  DATA_JOB_CRYPTO_HISTORY = 2
+};
+
+struct DataJob {
+  DataJobType type;
+  int index;
+  int count;
+  char coinGeckoId[32];
+};
+
+QueueHandle_t dataJobQueue = nullptr;
+SemaphoreHandle_t dataWorkerMutex = nullptr;
+TaskHandle_t dataWorkerTaskHandle = nullptr;
+bool cryptoPriceJobQueued = false;
+bool cryptoPriceResultReady = false;
+bool cryptoPriceResultOk = false;
+int stagedCryptoPriceCount = 0;
+float stagedCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
+bool cryptoHistoryJobQueued = false;
+bool cryptoHistoryResultReady = false;
+bool cryptoHistoryResultOk = false;
+int stagedCryptoHistoryIndex = -1;
+int stagedCryptoHistoryCount = 0;
+float stagedCryptoHistory[HISTORY_POINTS];
 
 // ---------------- Weather / Forecast ----------------
 struct ForecastDay {
@@ -404,6 +436,11 @@ void renderCryptoWindow();
 void updateCryptoAutoScroll();
 void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
+void startDataWorker();
+bool queueCryptoPriceRefresh();
+bool queueCryptoHistoryRefresh(int index);
+bool dataWorkerBusy();
+void applyDataWorkerResults();
 void drawCryptoSparklines();
 void pairTradingRender();
 void tradingSignalsRender();
@@ -488,6 +525,7 @@ void setup() {
   loadDeviceConfigurationFromSD();
   loadCryptoConfigurationFromSD();
   connectWiFi();
+  startDataWorker();
   if (!setupModeActive && WiFi.status() == WL_CONNECTED) {
     startMdns();
     startWebEditor();
@@ -503,7 +541,8 @@ void setup() {
     refreshAll();
     fetchForecast4();
     updateForecastLabels();
-    updateCrypto();
+    set_status("Crypto updating");
+    queueCryptoPriceRefresh();
     lastCryptoPriceRefresh = millis();
     startCryptoHistoryRefresh();
 
@@ -515,6 +554,7 @@ void setup() {
 void loop() {
   webServer.handleClient();
   lv_timer_handler();
+  applyDataWorkerResults();
   updateBatteryStatus();
   updateCryptoAutoScroll();
   logTouchDebug();
@@ -526,28 +566,26 @@ void loop() {
   bool touchSettledForNetwork = millis() - lastTouchInteractionMs >= touchNetworkSettleMs;
 
   if (cryptoWebRefreshPending) {
-    updateCrypto();
-    lastCryptoPriceRefresh = millis();
-    lastCryptoWebRefresh = lastCryptoPriceRefresh;
-    cryptoWebRefreshPending = false;
+    if (queueCryptoPriceRefresh()) {
+      set_status("Crypto updating");
+      lastCryptoPriceRefresh = millis();
+      lastCryptoWebRefresh = lastCryptoPriceRefresh;
+      cryptoWebRefreshPending = false;
+    }
   }
 
-  if (touchSettledForNetwork && millis() - lastWeatherRefresh >= weatherRefreshIntervalMs) {
+  if (touchSettledForNetwork && !dataWorkerBusy() && millis() - lastWeatherRefresh >= weatherRefreshIntervalMs) {
     refreshAll(currentPage == 0);
     lastWeatherRefresh = millis();
   }
 
   if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
-    set_status("Updating...");
-    updateCrypto();
-    pairTradingDirty = true;
-    tradingSignalsDirty = true;
-    if (currentPage == 2) pairTradingRender();
-    if (currentPage == 3) tradingSignalsRender();
-    set_status("Updated");
-    lastCryptoPriceRefresh = millis();
-    cryptoRefreshPending = false;
-    if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
+    set_status("Crypto updating");
+    if (queueCryptoPriceRefresh()) {
+      lastCryptoPriceRefresh = millis();
+      cryptoRefreshPending = false;
+      if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
+    }
   }
 
   if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoHistoryRefreshPending) {
@@ -555,21 +593,12 @@ void loop() {
   }
 
   if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
-    set_status("Updating...");
-    updateCrypto();
-    pairTradingDirty = true;
-    tradingSignalsDirty = true;
-    if (currentPage == 2) pairTradingRender();
-    if (currentPage == 3) tradingSignalsRender();
-    set_status("Updated");
-    lastCryptoPriceRefresh = millis();
+    set_status("Crypto updating");
+    if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
   }
 
   if (touchSettledForNetwork && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
-    updateCrypto();
-    pairTradingDirty = true;
-    tradingSignalsDirty = true;
-    lastCryptoPriceRefresh = millis();
+    if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
   }
 
   if (millis() - lastHistoryRefresh >= historyRefreshIntervalMs) {

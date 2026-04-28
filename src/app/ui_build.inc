@@ -34,10 +34,10 @@ void buildUI() {
   lv_label_set_text(status_label, "Starting...");
   lv_obj_set_style_text_font(status_label, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(status_label, lv_color_hex(0xAAAAAA), 0);
-  lv_obj_set_width(status_label, 120);
+  lv_obj_set_width(status_label, 160);
   lv_label_set_long_mode(status_label, LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_RIGHT, 0);
-  lv_obj_set_pos(status_label, 346, 14);
+  lv_obj_set_pos(status_label, 306, 14);
 
   battery_label = lv_label_create(scr);
   lv_label_set_text(battery_label, batteryMonitorEnabled() ? "Batt ..." : "Batt off");
