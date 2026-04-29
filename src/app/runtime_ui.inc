@@ -351,6 +351,7 @@ void dataWorkerTask(void *param) {
         if (count > MAX_ACTIVE_CRYPTO_COUNT) count = MAX_ACTIVE_CRYPTO_COUNT;
         stagedCryptoPriceCount = count;
         for (int i = 0; i < count; i++) stagedCryptoValues[i] = latestValues[i];
+        stagedCryptoPriceRateLimited = cryptoPriceResultRateLimited;
         cryptoPriceResultOk = ok;
         cryptoPriceResultReady = true;
         xSemaphoreGive(dataWorkerMutex);
@@ -400,6 +401,7 @@ void startDataWorker() {
 
 bool queueCryptoPriceRefresh() {
   if (!dataJobQueue || !dataWorkerMutex) return false;
+  if (cryptoCurrentBackoffActive()) return false;
 
   if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
   bool alreadyBusy = cryptoPriceJobQueued || cryptoPriceResultReady;
@@ -466,11 +468,13 @@ void finishCryptoHistoryStep() {
       cryptoHistoryRefreshIndex = -1;
       cryptoHistoryRetryMissingOnly = false;
       lastHistoryRefresh = millis();
+      lastCryptoPriceRefresh = lastHistoryRefresh;
+      lastCryptoWebRefresh = lastHistoryRefresh;
       if (currentPage == 1) set_status("Updated");
     } else {
       cryptoHistoryRetryMissingOnly = true;
       cryptoHistoryRefreshIndex = 0;
-      nextCryptoHistoryRetryMs = millis() + cryptoHistoryRetryIntervalMs;
+      nextCryptoHistoryRetryMs = millis() + cryptoHistoryRetryIntervalMs();
       if (currentPage == 1) set_status("Retry history...");
     }
   }
@@ -481,6 +485,7 @@ void applyDataWorkerResults() {
 
   bool havePrice = false;
   bool priceOk = false;
+  bool priceRateLimited = false;
   int priceCount = 0;
   float priceValues[MAX_ACTIVE_CRYPTO_COUNT];
   bool haveHistory = false;
@@ -493,6 +498,7 @@ void applyDataWorkerResults() {
   if (cryptoPriceResultReady) {
     havePrice = true;
     priceOk = cryptoPriceResultOk;
+    priceRateLimited = stagedCryptoPriceRateLimited;
     priceCount = stagedCryptoPriceCount;
     if (priceCount > MAX_ACTIVE_CRYPTO_COUNT) priceCount = MAX_ACTIVE_CRYPTO_COUNT;
     for (int i = 0; i < priceCount; i++) priceValues[i] = stagedCryptoValues[i];
@@ -525,8 +531,15 @@ void applyDataWorkerResults() {
     tradingSignalsDirty = true;
     if (currentPage == 2) pairTradingRender();
     if (currentPage == 3) tradingSignalsRender();
-    if (priceOk) set_status("Updated");
-    else if (hasDisplayedPrice) set_status("Cached prices");
+    if (priceOk) {
+      nextCryptoCurrentRetryMs = 0;
+      set_status("Updated");
+    } else if (priceRateLimited) {
+      nextCryptoCurrentRetryMs = millis() + cryptoCurrentRetryIntervalMs();
+      Serial.printf("CG current batch: rate limited, retry after %d minute(s)\n", deviceConfig.cgCurrentRetryMinutes);
+      if (hasDisplayedPrice) set_status("CG wait");
+      else set_status("CG rate limit");
+    } else if (hasDisplayedPrice) set_status("Cached prices");
     else set_status("No prices");
   }
 
@@ -786,7 +799,7 @@ void stepCryptoHistoryRefresh() {
   }
   nextCryptoHistoryRetryMs = 0;
 
-  if (lastCryptoHistoryStepMs != 0 && (now - lastCryptoHistoryStepMs) < CRYPTO_HISTORY_STEP_INTERVAL_MS) {
+  if (lastCryptoHistoryStepMs != 0 && (now - lastCryptoHistoryStepMs) < cryptoHistoryStepIntervalMs()) {
     return;
   }
 
@@ -802,6 +815,8 @@ void stepCryptoHistoryRefresh() {
     cryptoHistoryRefreshIndex = -1;
     cryptoHistoryRetryMissingOnly = false;
     lastHistoryRefresh = millis();
+    lastCryptoPriceRefresh = lastHistoryRefresh;
+    lastCryptoWebRefresh = lastHistoryRefresh;
     pairTradingDirty = true;
     tradingSignalsDirty = true;
     if (currentPage == 1) set_status("Updated");

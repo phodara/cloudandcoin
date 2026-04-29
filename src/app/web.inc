@@ -55,7 +55,7 @@ String editorChromeStart(const char *title, const char *subtitle) {
   body += "</p>";
   if (!setupModeActive) {
     body += "<div class=\"nav\">";
-    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
+    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
     body += "</div>";
   }
   return body;
@@ -80,6 +80,16 @@ String configSummaryHtml() {
   body += htmlEscape(deviceConfig.timezone);
   body += "</code> (";
   body += configSourceLabel(deviceConfigStatus.timezoneFromSd);
+  body += ")</p><p>Screen brightness: <code>";
+  body += String(deviceConfig.screenBrightnessPercent);
+  body += "%</code> (";
+  body += configSourceLabel(deviceConfigStatus.screenBrightnessFromSd);
+  body += ")</p><p>CoinGecko timing: <code>";
+  body += String(deviceConfig.cgCurrentRefreshSeconds);
+  body += "s current / ";
+  body += String(deviceConfig.cgHistoryStepSeconds);
+  body += "s history step</code> (";
+  body += configSourceLabel(deviceConfigStatus.coinGeckoTimingFromSd);
   body += ")</p></div>";
   return body;
 }
@@ -107,7 +117,6 @@ void sendTickerEditorPage(const char *message, bool success) {
     fileContent = "# Example\nBTC|bitcoin|0\nETH|ethereum|0\nADA|cardano|3\n";
   }
 
-  body += configSummaryHtml();
   body += "<form method=\"POST\" action=\"/tickers/save\">";
   body += "<textarea name=\"content\" spellcheck=\"false\">";
   body += htmlEscape(fileContent);
@@ -325,6 +334,7 @@ void handleSecretsEditorSave() {
 
   loadDeviceConfigurationFromSD();
   applyTimezoneConfig();
+  applyScreenBrightness();
   refreshAll();
   set_status("Secrets saved");
   sendSecretsEditorPage("Saved. Weather settings apply immediately. Reboot to fully apply Wi-Fi or hostname changes.", true);
@@ -348,6 +358,7 @@ void handleSecretsSaveAndReboot() {
 
   loadDeviceConfigurationFromSD();
   applyTimezoneConfig();
+  applyScreenBrightness();
   refreshAll();
   set_status("Rebooting...");
 
@@ -357,6 +368,132 @@ void handleSecretsSaveAndReboot() {
   webServer.send(200, "text/html", body);
   delay(200);
   ESP.restart();
+}
+
+void sendBrightnessPage(const char *message, bool success) {
+  if (!ensureWebAuthorized()) return;
+
+  String body = editorChromeStart("Brightness", "Adjust the device screen backlight. The saved value is stored on the SD card and reapplied after reboot.");
+  appendMessage(body, message, success);
+  body += "<form method=\"POST\" action=\"/brightness/save\">";
+  body += "<label for=\"screen_brightness\">Screen Brightness</label><input id=\"screen_brightness\" name=\"screen_brightness\" type=\"range\" min=\"5\" max=\"100\" value=\"";
+  body += String(deviceConfig.screenBrightnessPercent);
+  body += "\" oninput=\"brightness_value.value=this.value + '%'\">";
+  body += "<input id=\"brightness_value\" readonly value=\"";
+  body += String(deviceConfig.screenBrightnessPercent);
+  body += "%\">";
+  body += "<br><button type=\"submit\">Save Brightness</button></form>";
+  body += "</div></div></body></html>";
+
+  webServer.send(200, "text/html", body);
+}
+
+void handleBrightnessRoot() {
+  sendBrightnessPage("", true);
+}
+
+void handleBrightnessSave() {
+  if (!ensureWebAuthorized()) return;
+
+  if (!webServer.hasArg("screen_brightness")) {
+    sendBrightnessPage("No brightness value was received.", false);
+    return;
+  }
+
+  int brightness = clampScreenBrightnessPercent(webServer.arg("screen_brightness").toInt());
+  bool fileOk = false;
+  String content = loadTextFileFromSD(DEVICE_SECRETS_PATH, fileOk);
+  if (!fileOk) content = buildSecretsFileFromConfig();
+  content = upsertConfigLine(content, "screen_brightness", String(brightness));
+
+  if (!saveTextFileToSD(DEVICE_SECRETS_PATH, content)) {
+    sendBrightnessPage("Save failed. Check the SD card and try again.", false);
+    return;
+  }
+
+  deviceConfig.screenBrightnessPercent = brightness;
+  deviceConfigStatus.screenBrightnessFromSd = true;
+  applyScreenBrightness();
+  set_status("Brightness saved");
+  sendBrightnessPage("Saved. Brightness will be restored after reboot.", true);
+}
+
+void appendNumberInput(String& body, const char *id, const char *label, int value, int minValue, int maxValue, const char *suffix) {
+  body += "<label for=\"";
+  body += id;
+  body += "\">";
+  body += label;
+  body += "</label><input id=\"";
+  body += id;
+  body += "\" name=\"";
+  body += id;
+  body += "\" type=\"number\" min=\"";
+  body += String(minValue);
+  body += "\" max=\"";
+  body += String(maxValue);
+  body += "\" value=\"";
+  body += String(value);
+  body += "\">";
+  if (suffix && *suffix) {
+    body += "<p class=\"brand-note\">";
+    body += htmlEscape(String(suffix));
+    body += "</p>";
+  }
+}
+
+void sendCoinGeckoTimingPage(const char *message, bool success) {
+  if (!ensureWebAuthorized()) return;
+
+  String body = editorChromeStart("CoinGecko Timing", "Adjust how often the device calls CoinGecko for current prices and history data.");
+  appendMessage(body, message, success);
+  body += "<form method=\"POST\" action=\"/coingecko/save\">";
+  appendNumberInput(body, "cg_current_refresh_seconds", "Current Price Refresh", deviceConfig.cgCurrentRefreshSeconds, 30, 3600, "Seconds between current-price calls while viewing Crypto, Pair Trading, or Signals.");
+  appendNumberInput(body, "cg_current_retry_minutes", "Current Price Retry Delay", deviceConfig.cgCurrentRetryMinutes, 1, 1440, "Minutes to wait before retrying current prices after a rate limit.");
+  appendNumberInput(body, "cg_background_refresh_minutes", "Background Price Refresh", deviceConfig.cgBackgroundRefreshMinutes, 1, 1440, "Minutes between current-price calls while the device is on Weather.");
+  appendNumberInput(body, "cg_web_refresh_seconds", "Web View Price Refresh", deviceConfig.cgWebRefreshSeconds, 30, 3600, "Seconds between web-triggered current-price refresh requests.");
+  appendNumberInput(body, "cg_history_step_seconds", "History Request Spacing", deviceConfig.cgHistoryStepSeconds, 10, 3600, "Seconds to wait between individual history calls for each ticker.");
+  appendNumberInput(body, "cg_history_retry_minutes", "History Retry Delay", deviceConfig.cgHistoryRetryMinutes, 1, 1440, "Minutes to wait before retrying missing history after a failure or rate limit.");
+  appendNumberInput(body, "cg_history_refresh_hours", "Full History Refresh", deviceConfig.cgHistoryRefreshHours, 1, 168, "Hours between full history refresh cycles.");
+  body += "<br><button type=\"submit\">Save CoinGecko Timing</button></form>";
+  body += "</div></div></body></html>";
+
+  webServer.send(200, "text/html", body);
+}
+
+void handleCoinGeckoTimingRoot() {
+  sendCoinGeckoTimingPage("", true);
+}
+
+void handleCoinGeckoTimingSave() {
+  if (!ensureWebAuthorized()) return;
+
+  deviceConfig.cgCurrentRefreshSeconds = clampIntRange(webServer.arg("cg_current_refresh_seconds").toInt(), 30, 3600);
+  deviceConfig.cgCurrentRetryMinutes = clampIntRange(webServer.arg("cg_current_retry_minutes").toInt(), 1, 1440);
+  deviceConfig.cgBackgroundRefreshMinutes = clampIntRange(webServer.arg("cg_background_refresh_minutes").toInt(), 1, 1440);
+  deviceConfig.cgWebRefreshSeconds = clampIntRange(webServer.arg("cg_web_refresh_seconds").toInt(), 30, 3600);
+  deviceConfig.cgHistoryStepSeconds = clampIntRange(webServer.arg("cg_history_step_seconds").toInt(), 10, 3600);
+  deviceConfig.cgHistoryRetryMinutes = clampIntRange(webServer.arg("cg_history_retry_minutes").toInt(), 1, 1440);
+  deviceConfig.cgHistoryRefreshHours = clampIntRange(webServer.arg("cg_history_refresh_hours").toInt(), 1, 168);
+  deviceConfigStatus.coinGeckoTimingFromSd = true;
+
+  bool fileOk = false;
+  String content = loadTextFileFromSD(DEVICE_SECRETS_PATH, fileOk);
+  if (!fileOk) content = buildSecretsFileFromConfig();
+  content = upsertConfigLine(content, "cg_current_refresh_seconds", String(deviceConfig.cgCurrentRefreshSeconds));
+  content = upsertConfigLine(content, "cg_current_retry_minutes", String(deviceConfig.cgCurrentRetryMinutes));
+  content = upsertConfigLine(content, "cg_background_refresh_minutes", String(deviceConfig.cgBackgroundRefreshMinutes));
+  content = upsertConfigLine(content, "cg_web_refresh_seconds", String(deviceConfig.cgWebRefreshSeconds));
+  content = upsertConfigLine(content, "cg_history_step_seconds", String(deviceConfig.cgHistoryStepSeconds));
+  content = upsertConfigLine(content, "cg_history_retry_minutes", String(deviceConfig.cgHistoryRetryMinutes));
+  content = upsertConfigLine(content, "cg_history_refresh_hours", String(deviceConfig.cgHistoryRefreshHours));
+
+  if (!saveTextFileToSD(DEVICE_SECRETS_PATH, content)) {
+    sendCoinGeckoTimingPage("Save failed. Check the SD card and try again.", false);
+    return;
+  }
+
+  set_status("CG timing saved");
+  sendCoinGeckoTimingPage("Saved. New CoinGecko timing will be used for the next scheduled requests.", true);
 }
 
 void sendSetupPage(const char *message, bool success) {
@@ -390,6 +527,18 @@ void sendSetupPage(const char *message, bool success) {
   body += "<label for=\"mdns_hostname\">mDNS Hostname</label><input id=\"mdns_hostname\" name=\"mdns_hostname\" value=\"";
   body += htmlEscape(deviceConfig.mdnsHostname);
   body += "\">";
+  body += "<label for=\"screen_brightness\">Screen Brightness</label><input id=\"screen_brightness\" name=\"screen_brightness\" type=\"number\" min=\"5\" max=\"100\" value=\"";
+  body += String(deviceConfig.screenBrightnessPercent);
+  body += "\">";
+  body += "<label for=\"cg_current_refresh_seconds\">CoinGecko Current Refresh Seconds</label><input id=\"cg_current_refresh_seconds\" name=\"cg_current_refresh_seconds\" type=\"number\" min=\"30\" max=\"3600\" value=\"";
+  body += String(deviceConfig.cgCurrentRefreshSeconds);
+  body += "\">";
+  body += "<label for=\"cg_current_retry_minutes\">CoinGecko Current Retry Minutes</label><input id=\"cg_current_retry_minutes\" name=\"cg_current_retry_minutes\" type=\"number\" min=\"1\" max=\"1440\" value=\"";
+  body += String(deviceConfig.cgCurrentRetryMinutes);
+  body += "\">";
+  body += "<label for=\"cg_history_step_seconds\">CoinGecko History Spacing Seconds</label><input id=\"cg_history_step_seconds\" name=\"cg_history_step_seconds\" type=\"number\" min=\"10\" max=\"3600\" value=\"";
+  body += String(deviceConfig.cgHistoryStepSeconds);
+  body += "\">";
   body += "<br><button type=\"submit\">Save Setup And Reboot</button></form>";
 
   if (fileOk) {
@@ -414,6 +563,18 @@ void handleSetupSave() {
   String weatherLocation = webServer.arg("weather_location");
   String timezone = webServer.arg("timezone");
   String mdnsHostname = webServer.arg("mdns_hostname");
+  int screenBrightness = webServer.hasArg("screen_brightness")
+    ? clampScreenBrightnessPercent(webServer.arg("screen_brightness").toInt())
+    : DEFAULT_SCREEN_BRIGHTNESS_PERCENT;
+  int cgCurrentRefreshSeconds = webServer.hasArg("cg_current_refresh_seconds")
+    ? clampIntRange(webServer.arg("cg_current_refresh_seconds").toInt(), 30, 3600)
+    : DEFAULT_CG_CURRENT_REFRESH_SECONDS;
+  int cgCurrentRetryMinutes = webServer.hasArg("cg_current_retry_minutes")
+    ? clampIntRange(webServer.arg("cg_current_retry_minutes").toInt(), 1, 1440)
+    : DEFAULT_CG_CURRENT_RETRY_MINUTES;
+  int cgHistoryStepSeconds = webServer.hasArg("cg_history_step_seconds")
+    ? clampIntRange(webServer.arg("cg_history_step_seconds").toInt(), 10, 3600)
+    : DEFAULT_CG_HISTORY_STEP_SECONDS;
 
   if (wifiSsid.length() == 0 || webPassword.length() == 0) {
     sendSetupPage("WiFi SSID and web password are required.", false);
@@ -427,6 +588,10 @@ void handleSetupSave() {
   copyText(deviceConfig.weatherLocation, sizeof(deviceConfig.weatherLocation), weatherLocation.c_str(), DEFAULT_OWM_LOCATION);
   copyText(deviceConfig.timezone, sizeof(deviceConfig.timezone), timezone.c_str(), DEFAULT_TIMEZONE);
   copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), mdnsHostname.c_str(), DEFAULT_MDNS_HOSTNAME);
+  deviceConfig.screenBrightnessPercent = screenBrightness;
+  deviceConfig.cgCurrentRefreshSeconds = cgCurrentRefreshSeconds;
+  deviceConfig.cgCurrentRetryMinutes = cgCurrentRetryMinutes;
+  deviceConfig.cgHistoryStepSeconds = cgHistoryStepSeconds;
   sanitizeHostname(deviceConfig.mdnsHostname);
   if (deviceConfig.mdnsHostname[0] == '\0') {
     copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), DEFAULT_MDNS_HOSTNAME);
@@ -522,8 +687,11 @@ void handleRemoteViewRoot() {
   if (!ensureWebAuthorized()) return;
 
   bool requestCryptoRefresh = false;
-  if (WiFi.status() == WL_CONNECTED && currentPage == 0 && !cryptoWebRefreshPending &&
-      (lastCryptoWebRefresh == 0 || millis() - lastCryptoWebRefresh >= cryptoWebRefreshIntervalMs)) {
+  unsigned long lastAnyCryptoRefresh = lastCryptoWebRefresh > lastCryptoPriceRefresh
+    ? lastCryptoWebRefresh
+    : lastCryptoPriceRefresh;
+  if (WiFi.status() == WL_CONNECTED && currentPage == 0 && !cryptoHistoryRefreshPending && !cryptoWebRefreshPending &&
+      (lastAnyCryptoRefresh == 0 || millis() - lastAnyCryptoRefresh >= cryptoWebRefreshIntervalMs())) {
     cryptoWebRefreshPending = true;
     requestCryptoRefresh = true;
   }
@@ -551,7 +719,7 @@ void handleRemoteViewRoot() {
   body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 88px 68px 42px}.sig-reason{grid-column:1/-1;text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
-  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
+  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
 
   body += "<div class=\"status\"><div class=\"pill\"><b>Battery</b><span>";
   body += htmlEscape(formatBatteryText());
@@ -764,6 +932,10 @@ void handleInfoRoot() {
   sendInfoPage();
 }
 
+void handleNoContent() {
+  webServer.send(204, "text/plain", "");
+}
+
 void handleTickerEditorNotFound() {
   webServer.sendHeader("Location", setupModeActive ? "/secrets" : "/view", true);
   webServer.send(302, "text/plain", "");
@@ -781,12 +953,19 @@ void startWebEditor() {
     webServer.on("/tickers", HTTP_GET, handleTickerEditorRoot);
     webServer.on("/tickers/save", HTTP_POST, handleTickerEditorSave);
     webServer.on("/lookup", HTTP_GET, handleTickerLookupRoot);
+    webServer.on("/brightness", HTTP_GET, handleBrightnessRoot);
+    webServer.on("/brightness/save", HTTP_POST, handleBrightnessSave);
+    webServer.on("/coingecko", HTTP_GET, handleCoinGeckoTimingRoot);
+    webServer.on("/coingecko/save", HTTP_POST, handleCoinGeckoTimingSave);
     webServer.on("/secrets", HTTP_GET, handleSecretsEditorRoot);
     webServer.on("/secrets/save", HTTP_POST, handleSecretsEditorSave);
     webServer.on("/secrets/save-reboot", HTTP_POST, handleSecretsSaveAndReboot);
     webServer.on("/view", HTTP_GET, handleRemoteViewRoot);
     webServer.on("/info", HTTP_GET, handleInfoRoot);
   }
+  webServer.on("/favicon.ico", HTTP_GET, handleNoContent);
+  webServer.on("/robots.txt", HTTP_GET, handleNoContent);
+  webServer.on("/generate_204", HTTP_GET, handleNoContent);
   webServer.onNotFound(handleTickerEditorNotFound);
   webServer.begin();
   if (setupModeActive) Serial.println("Setup editor: browse to http://192.168.4.1/secrets");

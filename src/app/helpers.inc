@@ -105,6 +105,77 @@ void updateBatteryStatus(bool force) {
 
 }
 
+int clampScreenBrightnessPercent(int value) {
+  if (value < 5) return 5;
+  if (value > 100) return 100;
+  return value;
+}
+
+int clampIntRange(int value, int minValue, int maxValue) {
+  if (value < minValue) return minValue;
+  if (value > maxValue) return maxValue;
+  return value;
+}
+
+unsigned long secondsToMs(int seconds) {
+  return (unsigned long)seconds * 1000UL;
+}
+
+unsigned long minutesToMs(int minutes) {
+  return (unsigned long)minutes * 60UL * 1000UL;
+}
+
+unsigned long hoursToMs(int hours) {
+  return (unsigned long)hours * 60UL * 60UL * 1000UL;
+}
+
+unsigned long cryptoPriceRefreshIntervalMs() {
+  return secondsToMs(deviceConfig.cgCurrentRefreshSeconds);
+}
+
+unsigned long cryptoCurrentRetryIntervalMs() {
+  return minutesToMs(deviceConfig.cgCurrentRetryMinutes);
+}
+
+bool cryptoCurrentBackoffActive() {
+  return nextCryptoCurrentRetryMs != 0 && (long)(millis() - nextCryptoCurrentRetryMs) < 0;
+}
+
+unsigned long cryptoBackgroundRefreshIntervalMs() {
+  return minutesToMs(deviceConfig.cgBackgroundRefreshMinutes);
+}
+
+unsigned long cryptoWebRefreshIntervalMs() {
+  return secondsToMs(deviceConfig.cgWebRefreshSeconds);
+}
+
+unsigned long cryptoHistoryStepIntervalMs() {
+  return secondsToMs(deviceConfig.cgHistoryStepSeconds);
+}
+
+unsigned long cryptoHistoryRetryIntervalMs() {
+  return minutesToMs(deviceConfig.cgHistoryRetryMinutes);
+}
+
+unsigned long historyRefreshIntervalMs() {
+  return hoursToMs(deviceConfig.cgHistoryRefreshHours);
+}
+
+void initBacklightControl() {
+  ledcSetup(TFT_BL_PWM_CHANNEL, TFT_BL_PWM_FREQ, TFT_BL_PWM_RESOLUTION);
+  ledcAttachPin(TFT_BL_PIN, TFT_BL_PWM_CHANNEL);
+  int duty = (DEFAULT_SCREEN_BRIGHTNESS_PERCENT * TFT_BL_PWM_MAX_DUTY) / 100;
+  ledcWrite(TFT_BL_PWM_CHANNEL, duty);
+}
+
+void applyScreenBrightness() {
+  deviceConfig.screenBrightnessPercent = clampScreenBrightnessPercent(deviceConfig.screenBrightnessPercent);
+  int duty = (deviceConfig.screenBrightnessPercent * TFT_BL_PWM_MAX_DUTY) / 100;
+  ledcAttachPin(TFT_BL_PIN, TFT_BL_PWM_CHANNEL);
+  ledcWrite(TFT_BL_PWM_CHANNEL, duty);
+  Serial.printf("Display: brightness=%d%% duty=%d\n", deviceConfig.screenBrightnessPercent, duty);
+}
+
 bool containsIgnoreCase(const char *haystack, const char *needle) {
   if (!haystack || !needle || !*needle) return false;
 
@@ -263,6 +334,30 @@ String buildSecretsFileFromConfig() {
   content += "mdns_hostname=";
   content += deviceConfig.mdnsHostname;
   content += "\n";
+  content += "screen_brightness=";
+  content += String(clampScreenBrightnessPercent(deviceConfig.screenBrightnessPercent));
+  content += "\n";
+  content += "cg_current_refresh_seconds=";
+  content += String(deviceConfig.cgCurrentRefreshSeconds);
+  content += "\n";
+  content += "cg_current_retry_minutes=";
+  content += String(deviceConfig.cgCurrentRetryMinutes);
+  content += "\n";
+  content += "cg_background_refresh_minutes=";
+  content += String(deviceConfig.cgBackgroundRefreshMinutes);
+  content += "\n";
+  content += "cg_web_refresh_seconds=";
+  content += String(deviceConfig.cgWebRefreshSeconds);
+  content += "\n";
+  content += "cg_history_step_seconds=";
+  content += String(deviceConfig.cgHistoryStepSeconds);
+  content += "\n";
+  content += "cg_history_retry_minutes=";
+  content += String(deviceConfig.cgHistoryRetryMinutes);
+  content += "\n";
+  content += "cg_history_refresh_hours=";
+  content += String(deviceConfig.cgHistoryRefreshHours);
+  content += "\n";
   return content;
 }
 
@@ -280,6 +375,14 @@ void resetDeviceConfigDefaults() {
   copyText(deviceConfig.weatherLocation, sizeof(deviceConfig.weatherLocation), DEFAULT_OWM_LOCATION);
   copyText(deviceConfig.timezone, sizeof(deviceConfig.timezone), DEFAULT_TIMEZONE);
   copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), DEFAULT_MDNS_HOSTNAME);
+  deviceConfig.screenBrightnessPercent = DEFAULT_SCREEN_BRIGHTNESS_PERCENT;
+  deviceConfig.cgCurrentRefreshSeconds = DEFAULT_CG_CURRENT_REFRESH_SECONDS;
+  deviceConfig.cgCurrentRetryMinutes = DEFAULT_CG_CURRENT_RETRY_MINUTES;
+  deviceConfig.cgBackgroundRefreshMinutes = DEFAULT_CG_BACKGROUND_REFRESH_MINUTES;
+  deviceConfig.cgWebRefreshSeconds = DEFAULT_CG_WEB_REFRESH_SECONDS;
+  deviceConfig.cgHistoryStepSeconds = DEFAULT_CG_HISTORY_STEP_SECONDS;
+  deviceConfig.cgHistoryRetryMinutes = DEFAULT_CG_HISTORY_RETRY_MINUTES;
+  deviceConfig.cgHistoryRefreshHours = DEFAULT_CG_HISTORY_REFRESH_HOURS;
 
   deviceConfigStatus.sdCardAvailable = false;
   deviceConfigStatus.secretsFileFound = false;
@@ -289,6 +392,8 @@ void resetDeviceConfigDefaults() {
   deviceConfigStatus.weatherLocationFromSd = false;
   deviceConfigStatus.timezoneFromSd = false;
   deviceConfigStatus.mdnsHostnameFromSd = false;
+  deviceConfigStatus.screenBrightnessFromSd = false;
+  deviceConfigStatus.coinGeckoTimingFromSd = false;
 }
 
 void applyDeviceConfigValue(const char *key, const char *value) {
@@ -314,7 +419,80 @@ void applyDeviceConfigValue(const char *key, const char *value) {
   } else if (strcmp(key, "mdns_hostname") == 0) {
     copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), value);
     deviceConfigStatus.mdnsHostnameFromSd = true;
+  } else if (strcmp(key, "screen_brightness") == 0 || strcmp(key, "screen_brightness_percent") == 0) {
+    deviceConfig.screenBrightnessPercent = clampScreenBrightnessPercent(atoi(value));
+    deviceConfigStatus.screenBrightnessFromSd = true;
+  } else if (strcmp(key, "cg_current_refresh_seconds") == 0) {
+    deviceConfig.cgCurrentRefreshSeconds = clampIntRange(atoi(value), 30, 3600);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_current_retry_minutes") == 0) {
+    deviceConfig.cgCurrentRetryMinutes = clampIntRange(atoi(value), 1, 1440);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_background_refresh_minutes") == 0) {
+    deviceConfig.cgBackgroundRefreshMinutes = clampIntRange(atoi(value), 1, 1440);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_web_refresh_seconds") == 0) {
+    deviceConfig.cgWebRefreshSeconds = clampIntRange(atoi(value), 30, 3600);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_history_step_seconds") == 0) {
+    deviceConfig.cgHistoryStepSeconds = clampIntRange(atoi(value), 10, 3600);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_history_retry_minutes") == 0) {
+    deviceConfig.cgHistoryRetryMinutes = clampIntRange(atoi(value), 1, 1440);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
+  } else if (strcmp(key, "cg_history_refresh_hours") == 0) {
+    deviceConfig.cgHistoryRefreshHours = clampIntRange(atoi(value), 1, 168);
+    deviceConfigStatus.coinGeckoTimingFromSd = true;
   }
+}
+
+String upsertConfigLine(const String& content, const char *targetKey, const String& targetValue) {
+  String updated;
+  updated.reserve(content.length() + targetValue.length() + 32);
+
+  bool found = false;
+  int start = 0;
+  while (start < (int)content.length()) {
+    int end = content.indexOf('\n', start);
+    if (end < 0) end = content.length();
+
+    String line = content.substring(start, end);
+    String comparable = line;
+    comparable.trim();
+
+    int equals = comparable.indexOf('=');
+    if (equals > 0) {
+      String key = comparable.substring(0, equals);
+      key.trim();
+      key.toLowerCase();
+      if (key == targetKey || (strcmp(targetKey, "screen_brightness") == 0 && key == "screen_brightness_percent")) {
+        if (!found) {
+          updated += targetKey;
+          updated += "=";
+          updated += targetValue;
+          updated += "\n";
+        }
+        found = true;
+      } else {
+        updated += line;
+        updated += "\n";
+      }
+    } else {
+      updated += line;
+      updated += "\n";
+    }
+
+    start = end + 1;
+  }
+
+  if (!found) {
+    updated += targetKey;
+    updated += "=";
+    updated += targetValue;
+    updated += "\n";
+  }
+
+  return updated;
 }
 
 bool ensureSdCardReady() {
@@ -431,10 +609,15 @@ void loadDeviceConfigurationFromSD() {
     deviceConfigStatus.mdnsHostnameFromSd ? "sd" : "defaults"
   );
   Serial.printf(
-    "Secrets: loaded ssid=%s host=%s weather_location=%s timezone=%s\n",
+    "Secrets: loaded ssid=%s host=%s weather_location=%s timezone=%s brightness=%d%% cg_current=%ds cg_current_retry=%dm cg_bg=%dm cg_hist_step=%ds\n",
     deviceConfig.wifiSsid[0] ? deviceConfig.wifiSsid : "(empty)",
     deviceConfig.mdnsHostname,
     deviceConfig.weatherLocation,
-    deviceConfig.timezone
+    deviceConfig.timezone,
+    deviceConfig.screenBrightnessPercent,
+    deviceConfig.cgCurrentRefreshSeconds,
+    deviceConfig.cgCurrentRetryMinutes,
+    deviceConfig.cgBackgroundRefreshMinutes,
+    deviceConfig.cgHistoryStepSeconds
   );
 }

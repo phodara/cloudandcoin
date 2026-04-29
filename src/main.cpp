@@ -32,7 +32,12 @@
 #define SD_SCK_PIN    18
 #define SD_MISO_PIN   19
 #define SD_MOSI_PIN   23
-#define TOUCH_DEBUG   1
+
+// Set to 1 to print raw touch and tap-decision details to Serial.
+// This can also be overridden from platformio.ini with -D TOUCH_DEBUG=1.
+#ifndef TOUCH_DEBUG
+#define TOUCH_DEBUG   0
+#endif
 
 // ---------------- Battery monitor ----------------
 // This block is intentionally self-contained so it is easy to disable or remove.
@@ -63,12 +68,24 @@ const char* DEFAULT_TIMEZONE = "America/New_York";
 const char* DEFAULT_WEB_PASSWORD = "";
 const char* DEFAULT_SETUP_AP_NAME = "cloudandcoin-setup";
 const char* PROJECT_REPO_URL = "https://github.com/phodara/cloudandcoin";
+const int DEFAULT_SCREEN_BRIGHTNESS_PERCENT = 100;
+const int DEFAULT_CG_CURRENT_REFRESH_SECONDS = 60;
+const int DEFAULT_CG_CURRENT_RETRY_MINUTES = 5;
+const int DEFAULT_CG_BACKGROUND_REFRESH_MINUTES = 5;
+const int DEFAULT_CG_WEB_REFRESH_SECONDS = 60;
+const int DEFAULT_CG_HISTORY_STEP_SECONDS = 15;
+const int DEFAULT_CG_HISTORY_RETRY_MINUTES = 5;
+const int DEFAULT_CG_HISTORY_REFRESH_HOURS = 2;
 
 // ---------------- Hardware ----------------
 TFT_eSPI tft = TFT_eSPI();
 XPT2046_Touchscreen ts(TOUCH_CS_PIN);
 SPIClass sdSpi(HSPI);
 WebServer webServer(80);
+const int TFT_BL_PWM_CHANNEL = 0;
+const int TFT_BL_PWM_FREQ = 5000;
+const int TFT_BL_PWM_RESOLUTION = 10;
+const int TFT_BL_PWM_MAX_DUTY = (1 << TFT_BL_PWM_RESOLUTION) - 1;
 
 // ---------------- LVGL ----------------
 static const uint16_t screenWidth  = 480;
@@ -88,17 +105,13 @@ unsigned long lastWeatherRefresh = 0;
 const unsigned long weatherRefreshIntervalMs = 15000;
 
 unsigned long lastCryptoPriceRefresh = 0;
-const unsigned long cryptoPriceRefreshIntervalMs = 60000;
-const unsigned long cryptoBackgroundRefreshIntervalMs = 5UL * 60UL * 1000UL;
 unsigned long lastCryptoWebRefresh = 0;
-const unsigned long cryptoWebRefreshIntervalMs = 60000;
+unsigned long nextCryptoCurrentRetryMs = 0;
 const int webViewRefreshSeconds = 60;
 const int webViewRefreshAfterCryptoRequestSeconds = 8;
 
 unsigned long lastHistoryRefresh = 0;
-const unsigned long historyRefreshIntervalMs = 2UL * 60UL * 60UL * 1000UL;
 unsigned long nextCryptoHistoryRetryMs = 0;
-const unsigned long cryptoHistoryRetryIntervalMs = 30000UL;
 
 unsigned long lastForecastRefresh = 0;
 const unsigned long forecastRefreshIntervalMs = 3UL * 60UL * 60UL * 1000UL;
@@ -146,7 +159,6 @@ const int CRYPTO_VISIBLE_ROWS = 4;
 const int PAIR_VISIBLE_ROWS = 4;
 const int SIGNAL_VISIBLE_ROWS = 4;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
-const unsigned long CRYPTO_HISTORY_STEP_INTERVAL_MS = 3000UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
 bool cryptoHistoryOk[MAX_ACTIVE_CRYPTO_COUNT];
 float currentCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
@@ -174,8 +186,10 @@ TaskHandle_t dataWorkerTaskHandle = nullptr;
 bool cryptoPriceJobQueued = false;
 bool cryptoPriceResultReady = false;
 bool cryptoPriceResultOk = false;
+bool cryptoPriceResultRateLimited = false;
 int stagedCryptoPriceCount = 0;
 float stagedCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
+bool stagedCryptoPriceRateLimited = false;
 bool cryptoHistoryJobQueued = false;
 bool cryptoHistoryResultReady = false;
 bool cryptoHistoryResultOk = false;
@@ -205,6 +219,14 @@ struct DeviceConfig {
   char weatherLocation[64];
   char timezone[48];
   char mdnsHostname[32];
+  int screenBrightnessPercent;
+  int cgCurrentRefreshSeconds;
+  int cgCurrentRetryMinutes;
+  int cgBackgroundRefreshMinutes;
+  int cgWebRefreshSeconds;
+  int cgHistoryStepSeconds;
+  int cgHistoryRetryMinutes;
+  int cgHistoryRefreshHours;
 };
 
 struct DeviceConfigStatus {
@@ -216,6 +238,8 @@ struct DeviceConfigStatus {
   bool weatherLocationFromSd;
   bool timezoneFromSd;
   bool mdnsHostnameFromSd;
+  bool screenBrightnessFromSd;
+  bool coinGeckoTimingFromSd;
 };
 
 DeviceConfig deviceConfig;
@@ -429,6 +453,8 @@ void applyTimezoneConfig();
 void startSetupAccessPoint();
 void showSetupInstructions();
 void updateBatteryStatus(bool force = false);
+void initBacklightControl();
+void applyScreenBrightness();
 void handleRemoteViewRoot();
 const char* weatherIconCode(const char *condIn);
 String formatMemoryText();
@@ -496,6 +522,7 @@ void setup() {
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
+  initBacklightControl();
 
   SPI.begin(14, 12, 13);
   ts.begin();
@@ -523,6 +550,7 @@ void setup() {
   buildUI();
   updateBatteryStatus(true);
   loadDeviceConfigurationFromSD();
+  applyScreenBrightness();
   loadCryptoConfigurationFromSD();
   connectWiFi();
   startDataWorker();
@@ -557,7 +585,9 @@ void loop() {
   applyDataWorkerResults();
   updateBatteryStatus();
   updateCryptoAutoScroll();
+#if TOUCH_DEBUG
   logTouchDebug();
+#endif
   handleTapToggle();
   delay(5);
 
@@ -565,7 +595,7 @@ void loop() {
 
   bool touchSettledForNetwork = millis() - lastTouchInteractionMs >= touchNetworkSettleMs;
 
-  if (cryptoWebRefreshPending) {
+  if (cryptoWebRefreshPending && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive()) {
     if (queueCryptoPriceRefresh()) {
       set_status("Crypto updating");
       lastCryptoPriceRefresh = millis();
@@ -579,7 +609,7 @@ void loop() {
     lastWeatherRefresh = millis();
   }
 
-  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) {
       lastCryptoPriceRefresh = millis();
@@ -588,20 +618,20 @@ void loop() {
     }
   }
 
-  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoHistoryRefreshPending) {
+  if (touchSettledForNetwork && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
 
-  if (touchSettledForNetwork && (currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs()) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
   }
 
-  if (touchSettledForNetwork && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs()) {
     if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
   }
 
-  if (millis() - lastHistoryRefresh >= historyRefreshIntervalMs) {
+  if (millis() - lastHistoryRefresh >= historyRefreshIntervalMs()) {
     startCryptoHistoryRefresh();
   }
 

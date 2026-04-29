@@ -9,6 +9,7 @@
 - 4-day OpenWeather forecast
 - Current crypto prices from CoinGecko
 - Local web editor for settings and ticker management
+- Web-controlled screen brightness saved on the SD card
 - SD-card-based runtime configuration
 - Temporary remote configuration network for first-time Wi-Fi setup and recovery
 
@@ -40,12 +41,20 @@ Future pair-trading screen notes are captured in [`future-pair-trading.md`](futu
 
 Future lightweight crypto analysis ideas are captured in [`future-lightweight-crypto-analysis.md`](future-lightweight-crypto-analysis.md).
 
+Weather and CoinGecko refresh behavior is documented in [`refresh-timing.md`](refresh-timing.md).
+
 ## Web Interface
 
 - `http://cloudandcoin.local/`
 - `http://cloudandcoin.local/view`
 - `http://cloudandcoin.local/tickers`
+- `http://cloudandcoin.local/brightness`
+- `http://cloudandcoin.local/coingecko`
 - `http://cloudandcoin.local/secrets`
 - `http://cloudandcoin.local/info`
 
 The web pages use the `Cloud and Coin` branding, show battery/memory/network/local-time status, and support immediate ticker reload after saving.
+
+## Debug Flags
+
+- `TOUCH_DEBUG`: set to `1` to print raw touch and tap decision details to Serial; defaults to `0`.

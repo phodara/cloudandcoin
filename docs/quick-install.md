@@ -35,6 +35,14 @@ owm_api_key=YOUR_OPENWEATHER_API_KEY
 weather_location=Mount Kisco,US
 timezone=America/New_York
 mdns_hostname=cloudandcoin
+screen_brightness=100
+cg_current_refresh_seconds=60
+cg_current_retry_minutes=5
+cg_background_refresh_minutes=5
+cg_web_refresh_seconds=60
+cg_history_step_seconds=15
+cg_history_retry_minutes=5
+cg_history_refresh_hours=2
 ```
 
 Notes:
@@ -45,6 +53,9 @@ Notes:
 - Lines starting with `#` are treated as comments.
 - `owm_api_key` must be your active OpenWeather API key.
 - `weather_location` should use a city and country code such as `Mount Kisco,US`.
+- `screen_brightness` is a backlight percentage from `5` to `100`.
+- `cg_*` settings control CoinGecko refresh timing and can also be changed from the web UI.
+- See [`refresh-timing.md`](refresh-timing.md) for the full weather and crypto refresh logic.
 
 ## crypto_tickers.txt Format
 
@@ -143,12 +154,16 @@ After the device is online:
 - `http://cloudandcoin.local/view` opens the live web view
 - `http://cloudandcoin.local/tickers` edits `/crypto_tickers.txt`
 - `http://cloudandcoin.local/lookup` searches CoinGecko and generates ticker lines
+- `http://cloudandcoin.local/brightness` changes the device screen brightness
+- `http://cloudandcoin.local/coingecko` changes CoinGecko current-price and history timing
 - `http://cloudandcoin.local/secrets` edits `/secrets.txt`
 - `http://cloudandcoin.local/info` shows repository, license, notice, and contribution details
 
 ## Notes About Saving
 
 - `Save Secrets` applies weather-related changes immediately
+- `Save Brightness` applies the backlight immediately and stores it in `/secrets.txt`
+- `Save CoinGecko Timing` applies API timing immediately and stores it in `/secrets.txt`
 - `Save And Reboot` saves the edited secrets file and reboots the device
 - Wi-Fi and hostname changes are best applied with reboot
 

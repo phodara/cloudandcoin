@@ -11,6 +11,7 @@ For the current SD-card setup flow, see [`docs/quick-install.md`](docs/quick-ins
 - Draws 30-day sparkline history using CoinGecko data
 - Supports swipe navigation between weather and crypto screens
 - Provides a responsive web view for remote weather, crypto, battery, memory, and local time status
+- Lets you adjust screen brightness from the web UI and persist it on the SD card
 - Runs on an ESP32 with an ILI9486 TFT and XPT2046 touch controller
 
 ## Stack

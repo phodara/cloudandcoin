@@ -1,4 +1,5 @@
 bool fetchCurrentPricesUsd(float outVals[], int count) {
+  cryptoPriceResultRateLimited = false;
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("CG current batch: skipped, WiFi disconnected");
     for (int i = 0; i < count; i++) outVals[i] = NAN;
@@ -38,6 +39,7 @@ bool fetchCurrentPricesUsd(float outVals[], int count) {
     int code = http.GET();
     if (code != 200) {
       Serial.printf("CG current batch: ids=%s HTTP %d\n", ids, code);
+      if (code == 429) cryptoPriceResultRateLimited = true;
       http.end();
       continue;
     }
