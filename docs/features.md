@@ -35,6 +35,8 @@
 - `5-10` configured tickers: scrolling crypto list without sparklines
 - 30-day history is loaded in the background for sparkline-capable layouts and missing history is retried
 
+Current crypto trade signals and pair analysis are documented in [`crypto-trade-signals-analysis.md`](crypto-trade-signals-analysis.md).
+
 Future larger-list design notes are captured in [`future-crypto-scaling.md`](future-crypto-scaling.md).
 
 Future pair-trading screen notes are captured in [`future-pair-trading.md`](future-pair-trading.md).
