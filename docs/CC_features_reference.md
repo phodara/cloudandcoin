@@ -35,15 +35,15 @@
 - `5-10` configured tickers: scrolling crypto list without sparklines
 - 30-day history is loaded in the background for sparkline-capable layouts and missing history is retried
 
-Current crypto trade signals and pair analysis are documented in [`crypto-trade-signals-analysis.md`](crypto-trade-signals-analysis.md).
+Current crypto trade signals and pair analysis are documented in [`CC_crypto_trade_signals_reference.md`](CC_crypto_trade_signals_reference.md).
 
-Future larger-list design notes are captured in [`future-crypto-scaling.md`](future-crypto-scaling.md).
+Future larger-list design notes are captured in [`CC_crypto_scaling_plan.md`](CC_crypto_scaling_plan.md).
 
-Future pair-trading screen notes are captured in [`future-pair-trading.md`](future-pair-trading.md).
+Future pair-trading screen notes are captured in [`CC_pair_trading_plan.md`](CC_pair_trading_plan.md).
 
-Future lightweight crypto analysis ideas are captured in [`future-lightweight-crypto-analysis.md`](future-lightweight-crypto-analysis.md).
+Future lightweight crypto analysis ideas are captured in [`CC_lightweight_crypto_analysis_plan.md`](CC_lightweight_crypto_analysis_plan.md).
 
-Weather and CoinGecko refresh behavior is documented in [`refresh-timing.md`](refresh-timing.md).
+Weather and CoinGecko refresh behavior is documented in [`CC_refresh_timing_reference.md`](CC_refresh_timing_reference.md).
 
 ## Web Interface
 

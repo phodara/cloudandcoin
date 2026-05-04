@@ -130,7 +130,7 @@ Useful details:
 - Current prices refresh more often while viewing Crypto, Pair Trading, or Signals.
 - History loads one configured coin at a time.
 - Pair Trading and Signals may show waiting states until history is available.
-- If CoinGecko rate-limits requests, retry timing follows the settings documented in `docs/refresh-timing.md`.
+- If CoinGecko rate-limits requests, retry timing follows the settings documented in `CC_refresh_timing_reference.md`.
 
 ## Display Limits
 
@@ -167,6 +167,6 @@ The main implementation lives in:
 
 Related documentation:
 
-- `docs/refresh-timing.md`
-- `docs/future-lightweight-crypto-analysis.md`
-- `docs/future-pair-trading.md`
+- `CC_refresh_timing_reference.md`
+- `CC_lightweight_crypto_analysis_plan.md`
+- `CC_pair_trading_plan.md`

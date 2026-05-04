@@ -55,7 +55,7 @@ Notes:
 - `weather_location` should use a city and country code such as `Mount Kisco,US`.
 - `screen_brightness` is a backlight percentage from `5` to `100`.
 - `cg_*` settings control CoinGecko refresh timing and can also be changed from the web UI.
-- See [`refresh-timing.md`](refresh-timing.md) for the full weather and crypto refresh logic.
+- See [`CC_refresh_timing_reference.md`](CC_refresh_timing_reference.md) for the full weather and crypto refresh logic.
 
 ## crypto_tickers.txt Format
 
