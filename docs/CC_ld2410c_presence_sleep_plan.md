@@ -181,6 +181,13 @@ the idle timer once the sensor is proven reliable.
 
 ## Distance Filtering Options
 
+The `OUT` pin is a **boolean signal only** — `HIGH` when the sensor detects
+presence, `LOW` when it does not. It carries no distance or range information.
+
+The `UART` interface provides richer data: actual detected distance in
+centimetres, separate moving-target vs. stationary-target readings, and
+signal energy levels.
+
 There are two ways to enforce "wake only if presence is within a given
 distance":
 
@@ -190,7 +197,16 @@ distance":
 
 Option 1 is simpler and should be the first milestone.
 
-Option 2 is more flexible and keeps the rule visible in firmware/config, but it
+**Tuning detection range without UART firmware work:** The LD2410C has
+configurable detection gates built into the sensor itself. These can be
+adjusted using the Hi-Link Bluetooth configuration app (available for iOS and
+Android) or by sending UART config commands directly to the sensor from a PC.
+Once the gates are set, the sensor enforces the range limit autonomously and
+`OUT` continues to behave as a simple boolean — no ESP32 code changes needed.
+This makes Phase 5 optional: if the Bluetooth app provides sufficient range
+control for the installation, UART parsing in firmware may never be necessary.
+
+Option 2 is more flexible and keeps the distance rule visible in firmware/config, but it
 requires UART parsing and more testing around sleep/wake timing.
 
 ## Implementation Phases

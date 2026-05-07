@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 570" width="1000" height="570">
+
+  <!-- Background -->
+  <rect width="1000" height="570" fill="#eef0f3" rx="14"/>
+
+  <!-- Title -->
+  <text x="500" y="36" text-anchor="middle" font-family="'Courier New', monospace" font-size="15" font-weight="bold" fill="#1a2a3a">LD2410C Presence Sensor — Pin-to-Pin Wiring</text>
+  <text x="500" y="54" text-anchor="middle" font-family="'Courier New', monospace" font-size="11" fill="#55667788">Cloud and Coin · Hosyond ESP32 3.5" Board</text>
+
+  <!-- ═══════════════════════════════════════════
+       LD2410C MODULE
+       ═══════════════════════════════════════════ -->
+
+  <!-- PCB body -->
+  <rect x="52" y="95" width="158" height="300" rx="9" fill="#2a4e14" stroke="#162c0a" stroke-width="2.5"/>
+  <rect x="60" y="103" width="142" height="284" rx="6" fill="#305818"/>
+
+  <!-- Module silkscreen label -->
+  <text x="131" y="124" text-anchor="middle" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#ffffff">HLK-LD2410C</text>
+  <text x="131" y="138" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#a8e87a">mmWave Radar</text>
+
+  <!-- Radar IC chip -->
+  <rect x="78" y="150" width="106" height="72" rx="4" fill="#111" stroke="#3a3a3a" stroke-width="1.5"/>
+  <text x="131" y="182" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#888">LD2410C</text>
+  <text x="131" y="194" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#888">radar IC</text>
+
+  <!-- Antenna patch area -->
+  <rect x="75" y="238" width="112" height="130" rx="4" fill="#294c12" stroke="#4a7a28" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="131" y="298" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#7ab84a">antenna</text>
+  <text x="131" y="310" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#7ab84a">array</text>
+
+  <!-- LED indicator -->
+  <circle cx="172" cy="148" r="6" fill="#ff4444" stroke="#aa0000" stroke-width="1.5"/>
+  <text x="172" y="136" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#ffaaaa">LED</text>
+
+  <!-- ── LD2410C right-edge pin stubs + dots ── -->
+
+  <!-- VCC -->
+  <line x1="193" y1="178" x2="214" y2="178" stroke="#cc3333" stroke-width="3.5"/>
+  <circle cx="214" cy="178" r="6.5" fill="#cc3333" stroke="#881111" stroke-width="1.5"/>
+  <text x="188" y="174" text-anchor="end" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#ffffff">VCC</text>
+  <text x="188" y="186" text-anchor="end" font-family="'Courier New', monospace" font-size="9" fill="#a8e87a">5 V in</text>
+
+  <!-- GND -->
+  <line x1="193" y1="216" x2="214" y2="216" stroke="#555555" stroke-width="3.5"/>
+  <circle cx="214" cy="216" r="6.5" fill="#444444" stroke="#111111" stroke-width="1.5"/>
+  <text x="188" y="220" text-anchor="end" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#ffffff">GND</text>
+
+  <!-- OUT -->
+  <line x1="193" y1="255" x2="214" y2="255" stroke="#22aa44" stroke-width="3.5"/>
+  <circle cx="214" cy="255" r="6.5" fill="#22aa44" stroke="#116622" stroke-width="1.5"/>
+  <text x="188" y="251" text-anchor="end" font-family="'Courier New', monospace" font-size="12" font-weight="bold" fill="#ffffff">OUT</text>
+  <text x="188" y="263" text-anchor="end" font-family="'Courier New', monospace" font-size="9" fill="#a8e87a">3.3 V</text>
+
+  <!-- TX -->
+  <line x1="193" y1="296" x2="214" y2="296" stroke="#3b7fd4" stroke-width="3"/>
+  <circle cx="214" cy="296" r="6.5" fill="#3b7fd4" stroke="#1a4a8a" stroke-width="1.5"/>
+  <text x="188" y="300" text-anchor="end" font-family="'Courier New', monospace" font-size="12" fill="#aabbdd">TX</text>
+
+  <!-- RX -->
+  <line x1="193" y1="336" x2="214" y2="336" stroke="#d47a00" stroke-width="3"/>
+  <circle cx="214" cy="336" r="6.5" fill="#d47a00" stroke="#8a4a00" stroke-width="1.5"/>
+  <text x="188" y="340" text-anchor="end" font-family="'Courier New', monospace" font-size="12" fill="#aabbdd">RX</text>
+
+  <!-- ═══════════════════════════════════════════
+       WIRES
+       ═══════════════════════════════════════════ -->
+
+  <!-- VCC → UART 5V  (red, solid) -->
+  <path d="M221,178 H582" fill="none" stroke="#cc3333" stroke-width="2.8"/>
+
+  <!-- GND → UART GND  (dark, solid) -->
+  <path d="M221,216 H582" fill="none" stroke="#555555" stroke-width="2.8"/>
+
+  <!-- OUT → IO39  (green, solid) -->
+  <path d="M221,255 C400,255 400,272 582,272" fill="none" stroke="#22aa44" stroke-width="2.8"/>
+
+  <!-- TX → IO32  (blue, dashed) -->
+  <path d="M221,296 C400,296 400,338 582,338" fill="none" stroke="#3b7fd4" stroke-width="2.2" stroke-dasharray="10,5"/>
+
+  <!-- RX → IO25  (orange, dashed) -->
+  <path d="M221,336 C400,336 400,378 582,378" fill="none" stroke="#d47a00" stroke-width="2.2" stroke-dasharray="10,5"/>
+
+  <!-- ═══════════════════════════════════════════
+       ESP32 BOARD BODY
+       ═══════════════════════════════════════════ -->
+
+  <rect x="672" y="58" width="280" height="410" rx="9" fill="#122a5a" stroke="#0a1a38" stroke-width="2.5"/>
+  <rect x="680" y="66" width="264" height="394" rx="6" fill="#163070"/>
+
+  <!-- Board title -->
+  <text x="812" y="88" text-anchor="middle" font-family="'Courier New', monospace" font-size="11" font-weight="bold" fill="#ffffff">Hosyond ESP32 Board</text>
+  <text x="812" y="101" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#99aaee">3.5" 320×480 Resistive Touch</text>
+
+  <!-- TFT display cutout suggestion -->
+  <rect x="690" y="112" width="244" height="172" rx="4" fill="#0a1624" stroke="#2a3a54" stroke-width="1.5"/>
+  <text x="812" y="200" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#334455">ILI9486 TFT Display</text>
+  <text x="812" y="212" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#2a3a50">SPI: IO12/13/14/15</text>
+
+  <!-- ESP32 chip -->
+  <rect x="695" y="300" width="100" height="56" rx="4" fill="#111" stroke="#3a3a3a" stroke-width="1.5"/>
+  <text x="745" y="324" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#888888">ESP32</text>
+  <text x="745" y="336" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#666">WROOM-32</text>
+  <text x="745" y="348" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#555">WiFi + BT</text>
+
+  <!-- SD card slot -->
+  <rect x="810" y="300" width="70" height="34" rx="3" fill="#222" stroke="#555" stroke-width="1"/>
+  <text x="845" y="321" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#777">SD Card</text>
+  <text x="845" y="331" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#555">HSPI:18/19/23</text>
+
+  <!-- USB/power note -->
+  <rect x="695" y="375" width="180" height="26" rx="3" fill="#0e2248" stroke="#2a3a60" stroke-width="1"/>
+  <text x="785" y="392" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#7788bb">Touch CS:33  BL:27  Batt ADC:34</text>
+
+  <!-- ═══════════════════════════════════════════
+       CONNECTOR BOXES  (project left from board)
+       ═══════════════════════════════════════════ -->
+
+  <!-- ── UART Connector ── -->
+  <rect x="583" y="150" width="90" height="88" rx="5" fill="#0c2250" stroke="#4466cc" stroke-width="1.8"/>
+  <text x="628" y="165" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" font-weight="bold" fill="#99aaff">UART</text>
+  <text x="628" y="175" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#99aaff">Connector</text>
+
+  <!-- 5V pin -->
+  <circle cx="588" cy="178" r="5.5" fill="#cc3333" stroke="#881111" stroke-width="1.5"/>
+  <text x="600" y="182" font-family="'Courier New', monospace" font-size="11" font-weight="bold" fill="#ffffff">5V</text>
+
+  <!-- GND pin -->
+  <circle cx="588" cy="216" r="5.5" fill="#444" stroke="#111" stroke-width="1.5"/>
+  <text x="600" y="220" font-family="'Courier New', monospace" font-size="11" font-weight="bold" fill="#ffffff">GND</text>
+
+  <!-- unused note -->
+  <text x="628" y="232" text-anchor="middle" font-family="'Courier New', monospace" font-size="7" fill="#445566">TXD/RXD unused</text>
+
+  <!-- ── IO35/IO39 Header ── -->
+  <rect x="583" y="252" width="90" height="40" rx="5" fill="#0c2250" stroke="#4466cc" stroke-width="1.8"/>
+  <text x="628" y="265" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" font-weight="bold" fill="#99aaff">IO35/IO39</text>
+  <text x="628" y="275" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#99aaff">Header</text>
+
+  <!-- IO39 pin -->
+  <circle cx="588" cy="272" r="5.5" fill="#22aa44" stroke="#116622" stroke-width="1.5"/>
+  <text x="600" y="276" font-family="'Courier New', monospace" font-size="11" font-weight="bold" fill="#ffffff">IO39</text>
+
+  <!-- ── I2C Connector ── -->
+  <rect x="583" y="306" width="90" height="96" rx="5" fill="#0c2250" stroke="#4466cc" stroke-width="1.8"/>
+  <text x="628" y="320" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" font-weight="bold" fill="#99aaff">I2C</text>
+  <text x="628" y="330" text-anchor="middle" font-family="'Courier New', monospace" font-size="8" fill="#99aaff">Connector</text>
+
+  <!-- IO32 pin -->
+  <circle cx="588" cy="338" r="5.5" fill="#3b7fd4" stroke="#1a4a8a" stroke-width="1.5"/>
+  <text x="600" y="342" font-family="'Courier New', monospace" font-size="11" fill="#ffffff">IO32</text>
+  <text x="600" y="352" font-family="'Courier New', monospace" font-size="8" fill="#8899cc">ESP32 RX</text>
+
+  <!-- IO25 pin -->
+  <circle cx="588" cy="378" r="5.5" fill="#d47a00" stroke="#8a4a00" stroke-width="1.5"/>
+  <text x="600" y="382" font-family="'Courier New', monospace" font-size="11" fill="#ffffff">IO25</text>
+  <text x="600" y="392" font-family="'Courier New', monospace" font-size="8" fill="#8899cc">ESP32 TX</text>
+
+  <!-- pull-up warning badge -->
+  <rect x="583" y="398" width="90" height="18" rx="3" fill="#5a3500" stroke="#cc7700" stroke-width="1"/>
+  <text x="628" y="410" text-anchor="middle" font-family="'Courier New', monospace" font-size="7.5" fill="#ffbb44">⚠ 4.7 kΩ pull-ups</text>
+
+  <!-- ═══════════════════════════════════════════
+       PHASE LABELS ON WIRES
+       ═══════════════════════════════════════════ -->
+
+  <!-- Phase 1 bracket -->
+  <rect x="272" y="162" width="82" height="17" rx="3" fill="#1a4a1a" stroke="#22aa44" stroke-width="1"/>
+  <text x="313" y="173" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#66ee66">Phase 1 — required</text>
+
+  <!-- Phase 5 bracket -->
+  <rect x="272" y="310" width="84" height="17" rx="3" fill="#1a2a4a" stroke="#3b7fd4" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="314" y="321" text-anchor="middle" font-family="'Courier New', monospace" font-size="9" fill="#88aaee">Phase 5 — optional</text>
+
+  <!-- ═══════════════════════════════════════════
+       LEGEND
+       ═══════════════════════════════════════════ -->
+
+  <rect x="52" y="478" width="898" height="76" rx="7" fill="white" stroke="#cccccc" stroke-width="1.2"/>
+  <text x="72" y="497" font-family="'Courier New', monospace" font-size="11" font-weight="bold" fill="#222">Legend</text>
+
+  <!-- row 1 -->
+  <line x1="72" y1="512" x2="118" y2="512" stroke="#cc3333" stroke-width="2.8"/>
+  <circle cx="95" cy="512" r="4" fill="#cc3333"/>
+  <text x="126" y="516" font-family="'Courier New', monospace" font-size="10" fill="#333">5V power</text>
+
+  <line x1="220" y1="512" x2="266" y2="512" stroke="#555555" stroke-width="2.8"/>
+  <circle cx="243" cy="512" r="4" fill="#444"/>
+  <text x="274" y="516" font-family="'Courier New', monospace" font-size="10" fill="#333">Ground</text>
+
+  <line x1="368" y1="512" x2="414" y2="512" stroke="#22aa44" stroke-width="2.8"/>
+  <circle cx="391" cy="512" r="4" fill="#22aa44"/>
+  <text x="422" y="516" font-family="'Courier New', monospace" font-size="10" fill="#333">OUT presence signal (3.3 V logic) — Phase 1, required</text>
+
+  <!-- row 2 -->
+  <line x1="72" y1="537" x2="118" y2="537" stroke="#3b7fd4" stroke-width="2.2" stroke-dasharray="8,4"/>
+  <text x="126" y="541" font-family="'Courier New', monospace" font-size="10" fill="#333">LD2410C TX → IO32  (UART distance filtering — Phase 5, optional)</text>
+
+  <line x1="530" y1="537" x2="576" y2="537" stroke="#d47a00" stroke-width="2.2" stroke-dasharray="8,4"/>
+  <text x="584" y="541" font-family="'Courier New', monospace" font-size="10" fill="#333">LD2410C RX → IO25  (Phase 5, optional)</text>
+
+</svg>

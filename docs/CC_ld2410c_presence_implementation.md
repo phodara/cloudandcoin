@@ -8,24 +8,47 @@ This document covers the implementation of the Hi-Link HLK-LD2410C mmWave presen
 
 ## Hardware Wiring
 
-| LD2410C Pin | ESP32 Pin | Notes |
-|---|---|---|
-| VCC | board UART connector 5V | Sensor stays powered during ESP32 light sleep |
-| GND | board UART connector GND | Use UART connector — IO39 has no adjacent power pins |
-| OUT | IO39 | Input-only GPIO, currently unused in firmware |
+### Wiring Diagram
 
-**IO39** is preferred because it is input-only (no accidental drive risk) and unallocated. Do not use IO35 — reserved as battery charging-status input per `CC_charging_monitor_wiring_notes.md`.
+![LD2410C Wiring Diagram](images/CC_ld2410c_wiring_diagram.svg)
 
-The UART connector is the recommended power source for minimal wiring. Its TXD/RXD pins are unused by the sensor in Phase 1, and the SPI connector's 5V/GND pins are occupied by the SD card cable.
+```
+  HLK-LD2410C                              Hosyond ESP32 Board
+  ┌──────────────┐                         ┌───────────────────────────────┐
+  │              │                         │                               │
+  │  VCC  (5V)  ├─────────────────────────┤ 5V  ┐                        │
+  │              │                         │     ├─ UART Connector         │
+  │  GND        ├─────────────────────────┤ GND ┘                        │
+  │              │                         │                               │
+  │  OUT  (3.3V)├─────────────────────────┤ IO39 ── IO35/IO39 Header     │
+  │              │                         │                               │
+  │  TX   (3.3V)├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤ IO32 ┐                       │
+  │              │   Phase 5 / optional    │      ├─ I2C Connector ⚠      │
+  │  RX   (3.3V)├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤ IO25 ┘                       │
+  │              │                         │                               │
+  └──────────────┘                         └───────────────────────────────┘
 
-Optional UART wiring (Phase 5, not yet implemented):
+  ───  required wiring (Phase 1)
+  ╌╌╌  optional UART wiring (Phase 5, not yet implemented)
+  ⚠    IO32/IO25 have 4.7 kΩ pull-ups to 3.3V on this connector —
+       see I2C pull-up caution below
+```
 
-| LD2410C Pin | ESP32 Pin |
-|---|---|
-| TX | IO32 on I2C connector (ESP32 RX) |
-| RX | IO25 on I2C connector (ESP32 TX) |
+### Pin Reference Table
 
-**I2C pull-up caution:** IO32 and IO25 are on the board's I2C connector, which typically has 4.7kΩ pull-up resistors to 3.3V. The LD2410C defaults to 256000 baud where stray pull-ups can degrade signal quality. If UART communication is unreliable, inspect or remove those pull-ups before assuming the sensor or firmware is at fault.
+| LD2410C Pin | Logic | ESP32 Pin | Board Connector | Notes |
+|---|---|---|---|---|
+| VCC | 5V pwr | 5V | UART connector | Sensor stays powered during ESP32 light sleep |
+| GND | — | GND | UART connector | Use UART connector — IO39 has no adjacent power pins |
+| OUT | 3.3V | IO39 | IO35/IO39 header | Input-only GPIO, currently unused in firmware |
+| TX | 3.3V | IO32 | I2C connector | Phase 5 only — ESP32 RX |
+| RX | 3.3V | IO25 | I2C connector | Phase 5 only — ESP32 TX |
+
+**Why the UART connector for power:** Its TXD/RXD pins are unused by the sensor in Phase 1. The SPI connector's 5V/GND pins are occupied by the SD card cable. IO39 has no adjacent 5V/GND pins, so the UART connector is the cleanest single-cable power source.
+
+**IO39** is preferred for OUT because it is input-only (no accidental drive risk) and unallocated. Do not use IO35 — reserved as battery charging-status input per `CC_charging_monitor_wiring_notes.md`.
+
+**I2C pull-up caution (Phase 5):** IO32 and IO25 are on the board's I2C connector, which typically has 4.7 kΩ pull-up resistors to 3.3V. The LD2410C defaults to 256000 baud where stray pull-ups can degrade signal quality. If UART communication is unreliable, inspect or remove those pull-ups before assuming the sensor or firmware is at fault.
 
 ---
 
