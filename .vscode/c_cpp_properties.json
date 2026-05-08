@@ -493,6 +493,7 @@
                 "ARDUINO_ESP32_DEV",
                 "LV_CONF_INCLUDE_SIMPLE",
                 "USER_SETUP_LOADED=1",
+                "SCREEN_FLIP_VERTICAL=1",
                 "ILI9486_DRIVER",
                 "TFT_WIDTH=320",
                 "TFT_HEIGHT=480",

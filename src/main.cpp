@@ -39,6 +39,12 @@
 #define TOUCH_DEBUG   0
 #endif
 
+// Set to 1 to flip the landscape screen vertically (180 degrees).
+// This can also be overridden from platformio.ini with -D SCREEN_FLIP_VERTICAL=1.
+#ifndef SCREEN_FLIP_VERTICAL
+#define SCREEN_FLIP_VERTICAL 0
+#endif
+
 // ---------------- Battery monitor ----------------
 // This block is intentionally self-contained so it is easy to disable or remove.
 // For classic ESP32 with WiFi active, prefer an ADC1 pin such as 32, 34, 35, 36, or 39.
@@ -82,6 +88,11 @@ TFT_eSPI tft = TFT_eSPI();
 XPT2046_Touchscreen ts(TOUCH_CS_PIN);
 SPIClass sdSpi(HSPI);
 WebServer webServer(80);
+#if SCREEN_FLIP_VERTICAL
+const uint8_t TFT_DISPLAY_ROTATION = 3;
+#else
+const uint8_t TFT_DISPLAY_ROTATION = 1;
+#endif
 const int TFT_BL_PWM_CHANNEL = 0;
 const int TFT_BL_PWM_FREQ = 5000;
 const int TFT_BL_PWM_RESOLUTION = 10;
@@ -520,7 +531,7 @@ void setup() {
   digitalWrite(TFT_BL_PIN, HIGH);
 
   tft.init();
-  tft.setRotation(1);
+  tft.setRotation(TFT_DISPLAY_ROTATION);
   tft.fillScreen(TFT_BLACK);
   initBacklightControl();
 

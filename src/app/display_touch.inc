@@ -26,6 +26,10 @@ bool readMappedTouch(int &x, int &y, int *pressure = nullptr) {
   y = map(p.y, touchMinY, touchMaxY, screenHeight - 1, 0);
   x = constrain(x, 0, screenWidth - 1);
   y = constrain(y, 0, screenHeight - 1);
+#if SCREEN_FLIP_VERTICAL
+  x = screenWidth - 1 - x;
+  y = screenHeight - 1 - y;
+#endif
   return true;
 }
 
