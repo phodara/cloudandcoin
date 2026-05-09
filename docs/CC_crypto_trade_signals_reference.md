@@ -14,7 +14,7 @@ The crypto analysis features appear in two places:
 The current page flow is:
 
 ```text
-Weather -> Crypto -> Pair Trading -> Signals -> Weather
+Weather -> Crypto -> Stocks -> Pair Trading -> Signals -> Weather
 ```
 
 The `Signals` page is controlled by this build flag in `src/main.cpp`:

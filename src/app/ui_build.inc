@@ -176,6 +176,29 @@ void buildUI() {
     lv_obj_set_style_border_color(crypto_boxes[i], lv_color_hex(0x666666), 0);
   }
 
+  // Stocks page
+  stock_page = lv_obj_create(scr);
+  lv_obj_set_size(stock_page, PAGE_W, PAGE_H);
+  lv_obj_set_pos(stock_page, PAGE_X, PAGE_Y);
+  style_panel(stock_page);
+
+  stock_title_label = lv_label_create(scr);
+  lv_label_set_text(stock_title_label, "Stocks");
+  lv_obj_set_style_text_font(stock_title_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(stock_title_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_align(stock_title_label, LV_ALIGN_TOP_MID, 0, 12);
+  lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
+
+  for (int i = 0; i < STOCK_VISIBLE_ROWS; i++) {
+    stock_value_labels[i] = lv_label_create(stock_page);
+    lv_label_set_text(stock_value_labels[i], "--");
+    lv_obj_set_width(stock_value_labels[i], PAGE_W - 24);
+    lv_label_set_long_mode(stock_value_labels[i], LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(stock_value_labels[i], &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(stock_value_labels[i], lv_color_hex(0xFFFFFF), 0);
+    lv_obj_set_pos(stock_value_labels[i], 0, 24 + (i * 48));
+  }
+
   // Pair trading page
   pair_page = lv_obj_create(scr);
   lv_obj_set_size(pair_page, PAGE_W, PAGE_H);

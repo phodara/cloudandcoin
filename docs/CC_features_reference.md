@@ -1,6 +1,6 @@
 # Features
 
-`Cloud and Coin` is an ESP32 touchscreen dashboard for weather and cryptocurrency monitoring.
+`Cloud and Coin` is an ESP32 touchscreen dashboard for weather, cryptocurrency, and stock monitoring.
 
 ## Core Features
 
@@ -8,6 +8,7 @@
 - Live current weather display
 - 4-day OpenWeather forecast
 - Current crypto prices from CoinGecko
+- Current stock quotes from Finnhub
 - Local web editor for settings and ticker management
 - Web-controlled screen brightness saved on the SD card
 - SD-card-based runtime configuration
@@ -35,6 +36,16 @@
 - `5-10` configured tickers: scrolling crypto list without sparklines
 - 30-day history is loaded in the background for sparkline-capable layouts and missing history is retried
 
+## Stocks Screen
+
+- Configurable stock ticker list from `/stock_tickers.txt`
+- Uses `finnhub_api_key` from `/secrets.txt`
+- Shows current quote price and day percent change
+- Supports comments with `#`
+- `1-4` configured tickers: fixed stock layout
+- `5-10` configured tickers: scrolling stock list
+- Keeps the last good value on screen if a refresh fails
+
 Current crypto trade signals and pair analysis are documented in [`CC_crypto_trade_signals_reference.md`](CC_crypto_trade_signals_reference.md).
 
 Future larger-list design notes are captured in [`CC_crypto_scaling_plan.md`](CC_crypto_scaling_plan.md).
@@ -43,19 +54,21 @@ Future pair-trading screen notes are captured in [`CC_pair_trading_plan.md`](CC_
 
 Future lightweight crypto analysis ideas are captured in [`CC_lightweight_crypto_analysis_plan.md`](CC_lightweight_crypto_analysis_plan.md).
 
-Weather and CoinGecko refresh behavior is documented in [`CC_refresh_timing_reference.md`](CC_refresh_timing_reference.md).
+Weather, CoinGecko, and Finnhub refresh behavior is documented in [`CC_refresh_timing_reference.md`](CC_refresh_timing_reference.md).
 
 ## Web Interface
 
 - `http://cloudandcoin.local/`
 - `http://cloudandcoin.local/view`
 - `http://cloudandcoin.local/tickers`
+- `http://cloudandcoin.local/stocks`
+- `http://cloudandcoin.local/lookup`
 - `http://cloudandcoin.local/brightness`
 - `http://cloudandcoin.local/coingecko`
 - `http://cloudandcoin.local/secrets`
 - `http://cloudandcoin.local/info`
 
-The web pages use the `Cloud and Coin` branding, show battery/memory/network/local-time status, and support immediate ticker reload after saving.
+The web pages use the `Cloud and Coin` branding, show battery/memory/network/local-time status, and support immediate crypto and stock ticker reload after saving.
 
 ## Debug Flags
 

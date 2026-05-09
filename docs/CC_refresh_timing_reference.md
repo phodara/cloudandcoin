@@ -1,6 +1,6 @@
-# Weather and Crypto Refresh Timing
+# Weather, Crypto, and Stock Refresh Timing
 
-This document explains when the firmware calls OpenWeather and CoinGecko, which settings control those calls, and how rate-limit backoff works.
+This document explains when the firmware calls OpenWeather, CoinGecko, and Finnhub, which settings control those calls, and how rate-limit backoff works.
 
 ## Weather Timing
 
@@ -12,6 +12,16 @@ Weather timing is currently fixed in firmware:
 | 4-day forecast | 3 hours | Checked during weather refresh; fetched when the forecast interval has elapsed or forecast data is missing. |
 
 Current weather refreshes are skipped if Wi-Fi is disconnected. Forecast data is requested less often because it changes slowly and is a heavier API call than updating the current conditions.
+
+## Finnhub Stock Timing
+
+Stock quote timing is currently fixed in firmware:
+
+| Data | Default Timing | Notes |
+| --- | ---: | --- |
+| Stock quotes | 5 minutes | Runs when Wi-Fi is connected and `finnhub_api_key` is present in `/secrets.txt`. |
+
+Quotes are fetched one configured symbol at a time from `/stock_tickers.txt`. The Stocks page keeps the last good quote on screen if a later refresh fails. If no Finnhub key is configured, the page shows unavailable values and the status line reports that the stock key is missing.
 
 ## CoinGecko Timing Settings
 
@@ -110,6 +120,7 @@ means 30-day daily history data was returned.
 - If a history request fails or gets HTTP 429, only missing history is retried after `cg_history_retry_minutes`.
 - After all configured coins have successful history, the firmware waits `cg_history_refresh_hours` before starting another full history cycle.
 - Web-view-triggered current-price refreshes share timing with normal current-price refreshes so opening `/view` does not immediately duplicate a recent current-price request.
+- Stock quotes use a separate 5-minute timer and do not use CoinGecko backoff settings.
 
 ## Practical Guidance
 

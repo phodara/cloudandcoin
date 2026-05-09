@@ -59,7 +59,7 @@
 #define BATTERY_UPDATE_MS      10000UL
 
 // ---------------- Trading signals ----------------
-// Informational only. Disable to return to the three-screen app.
+// Informational only. Disable to remove the Signals page.
 #define ENABLE_TRADING_SIGNALS 1
 
 // ---------------- WiFi ----------------
@@ -74,6 +74,7 @@ const char* DEFAULT_TIMEZONE = "America/New_York";
 const char* DEFAULT_WEB_PASSWORD = "";
 const char* DEFAULT_SETUP_AP_NAME = "cloudandcoin-setup";
 const char* PROJECT_REPO_URL = "https://github.com/phodara/cloudandcoin";
+const char* DEFAULT_FINNHUB_API_KEY = "";
 const int DEFAULT_SCREEN_BRIGHTNESS_PERCENT = 100;
 const int DEFAULT_CG_CURRENT_REFRESH_SECONDS = 60;
 const int DEFAULT_CG_CURRENT_RETRY_MINUTES = 5;
@@ -118,8 +119,10 @@ const unsigned long weatherRefreshIntervalMs = 15000;
 unsigned long lastCryptoPriceRefresh = 0;
 unsigned long lastCryptoWebRefresh = 0;
 unsigned long nextCryptoCurrentRetryMs = 0;
+unsigned long lastStockPriceRefresh = 0;
 const int webViewRefreshSeconds = 60;
 const int webViewRefreshAfterCryptoRequestSeconds = 8;
+const unsigned long stockPriceRefreshIntervalMs = 5UL * 60UL * 1000UL;
 
 unsigned long lastHistoryRefresh = 0;
 unsigned long nextCryptoHistoryRetryMs = 0;
@@ -147,10 +150,11 @@ const unsigned long touchNetworkSettleMs = 750;
 float prevWeatherPressure = NAN;
 const char* DEVICE_SECRETS_PATH = "/secrets.txt";
 const char* CRYPTO_TICKERS_PATH = "/crypto_tickers.txt";
+const char* STOCK_TICKERS_PATH = "/stock_tickers.txt";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = pair trading, 3 = signals
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals
 bool cryptoSparklinesDirty = true;
 bool pairTradingDirty = true;
 bool tradingSignalsDirty = true;
@@ -159,6 +163,7 @@ bool cryptoRefreshPending = false;
 bool cryptoWebRefreshPending = false;
 bool cryptoHistoryRefreshPending = false;
 bool cryptoHistoryRetryMissingOnly = false;
+bool stockRefreshPending = false;
 bool setupModeActive = false;
 int cryptoHistoryRefreshIndex = -1;
 unsigned long lastCryptoHistoryStepMs = 0;
@@ -166,10 +171,13 @@ unsigned long lastCryptoHistoryStepMs = 0;
 // ---------------- Sparkline history ----------------
 const int HISTORY_POINTS = 30;
 const int MAX_ACTIVE_CRYPTO_COUNT = 10;
+const int MAX_ACTIVE_STOCK_COUNT = 10;
 const int CRYPTO_VISIBLE_ROWS = 4;
+const int STOCK_VISIBLE_ROWS = 4;
 const int PAIR_VISIBLE_ROWS = 4;
 const int SIGNAL_VISIBLE_ROWS = 4;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
+const unsigned long STOCK_SCROLL_INTERVAL_MS = 2500UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
 bool cryptoHistoryOk[MAX_ACTIVE_CRYPTO_COUNT];
 float currentCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
@@ -177,11 +185,19 @@ float previousCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
 int configuredCryptoCount = 4;
 int cryptoScrollOffset = 0;
 unsigned long lastCryptoScrollMs = 0;
+float currentStockValues[MAX_ACTIVE_STOCK_COUNT];
+float previousStockValues[MAX_ACTIVE_STOCK_COUNT];
+float currentStockChange[MAX_ACTIVE_STOCK_COUNT];
+float currentStockChangePercent[MAX_ACTIVE_STOCK_COUNT];
+int configuredStockCount = 4;
+int stockScrollOffset = 0;
+unsigned long lastStockScrollMs = 0;
 
 // ---------------- Background data worker ----------------
 enum DataJobType : uint8_t {
   DATA_JOB_CRYPTO_PRICES = 1,
-  DATA_JOB_CRYPTO_HISTORY = 2
+  DATA_JOB_CRYPTO_HISTORY = 2,
+  DATA_JOB_STOCK_PRICES = 3
 };
 
 struct DataJob {
@@ -207,6 +223,13 @@ bool cryptoHistoryResultOk = false;
 int stagedCryptoHistoryIndex = -1;
 int stagedCryptoHistoryCount = 0;
 float stagedCryptoHistory[HISTORY_POINTS];
+bool stockPriceJobQueued = false;
+bool stockPriceResultReady = false;
+bool stockPriceResultOk = false;
+int stagedStockPriceCount = 0;
+float stagedStockValues[MAX_ACTIVE_STOCK_COUNT];
+float stagedStockChange[MAX_ACTIVE_STOCK_COUNT];
+float stagedStockChangePercent[MAX_ACTIVE_STOCK_COUNT];
 
 // ---------------- Weather / Forecast ----------------
 struct ForecastDay {
@@ -227,6 +250,7 @@ struct DeviceConfig {
   char wifiPassword[64];
   char webPassword[64];
   char owmApiKey[96];
+  char finnhubApiKey[96];
   char weatherLocation[64];
   char timezone[48];
   char mdnsHostname[32];
@@ -246,6 +270,7 @@ struct DeviceConfigStatus {
   bool loadedFromSd;
   bool wifiFromSd;
   bool weatherKeyFromSd;
+  bool finnhubKeyFromSd;
   bool weatherLocationFromSd;
   bool timezoneFromSd;
   bool mdnsHostnameFromSd;
@@ -280,12 +305,14 @@ lv_obj_t *memory_label;
 
 lv_obj_t *weather_page;
 lv_obj_t *crypto_page;
+lv_obj_t *stock_page;
 lv_obj_t *pair_page;
 lv_obj_t *signal_page;
 lv_obj_t *setup_page;
 lv_obj_t *setup_message_label;
 
 lv_obj_t *weather_title_label;
+lv_obj_t *stock_title_label;
 lv_obj_t *pair_title_label;
 lv_obj_t *signal_title_label;
 lv_obj_t *weather_temp_label;
@@ -300,6 +327,7 @@ lv_obj_t *forecast_cond_label[4];
 
 lv_obj_t *crypto_title_label;
 lv_obj_t *crypto_value_labels[CRYPTO_VISIBLE_ROWS];
+lv_obj_t *stock_value_labels[STOCK_VISIBLE_ROWS];
 lv_obj_t *pair_value_labels[PAIR_VISIBLE_ROWS];
 lv_obj_t *signal_value_labels[SIGNAL_VISIBLE_ROWS];
 
@@ -341,6 +369,10 @@ struct ActiveCryptoConfig {
   char badgeChar;
 };
 
+struct ActiveStockConfig {
+  char symbol[12];
+};
+
 const CryptoDefinition SUPPORTED_CRYPTOS[] = {
   {"BTC", "bitcoin", 0, TFT_ORANGE, TFT_YELLOW, 'B'},
   {"ETH", "ethereum", 0, TFT_CYAN, TFT_CYAN, 'E'},
@@ -359,6 +391,7 @@ const uint16_t CRYPTO_SPARK_COLORS[] = {
 };
 
 ActiveCryptoConfig activeCryptos[MAX_ACTIVE_CRYPTO_COUNT];
+ActiveStockConfig activeStocks[MAX_ACTIVE_STOCK_COUNT];
 
 PressureTrend evaluatePressureTrend(float currentPressure);
 
@@ -457,6 +490,7 @@ void updateCrypto();
 void updateHistorySparklines();
 void loadDeviceConfigurationFromSD();
 void loadCryptoConfigurationFromSD();
+void loadStockConfigurationFromSD();
 void refreshAll(bool announceStatus = true);
 void startMdns();
 void startWebEditor();
@@ -470,12 +504,15 @@ void handleRemoteViewRoot();
 const char* weatherIconCode(const char *condIn);
 String formatMemoryText();
 void renderCryptoWindow();
+void renderStockWindow();
 void updateCryptoAutoScroll();
+void updateStockAutoScroll();
 void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
 void startDataWorker();
 bool queueCryptoPriceRefresh();
 bool queueCryptoHistoryRefresh(int index);
+bool queueStockPriceRefresh();
 bool dataWorkerBusy();
 void applyDataWorkerResults();
 void drawCryptoSparklines();
@@ -488,6 +525,7 @@ void tradingSignalsRender();
 #include "app/web.inc"
 #include "app/display_touch.inc"
 #include "app/crypto_data.inc"
+#include "app/stock_data.inc"
 #include "app/weather_data.inc"
 #include "app/runtime_ui.inc"
 #include "app/ui_build.inc"
@@ -563,6 +601,7 @@ void setup() {
   loadDeviceConfigurationFromSD();
   applyScreenBrightness();
   loadCryptoConfigurationFromSD();
+  loadStockConfigurationFromSD();
   connectWiFi();
   startDataWorker();
   if (!setupModeActive && WiFi.status() == WL_CONNECTED) {
@@ -584,6 +623,9 @@ void setup() {
     queueCryptoPriceRefresh();
     lastCryptoPriceRefresh = millis();
     startCryptoHistoryRefresh();
+    set_status("Stocks updating");
+    queueStockPriceRefresh();
+    lastStockPriceRefresh = millis();
 
     lastWeatherRefresh = millis();
   }
@@ -596,6 +638,7 @@ void loop() {
   applyDataWorkerResults();
   updateBatteryStatus();
   updateCryptoAutoScroll();
+  updateStockAutoScroll();
 #if TOUCH_DEBUG
   logTouchDebug();
 #endif
@@ -620,7 +663,7 @@ void loop() {
     lastWeatherRefresh = millis();
   }
 
-  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 2 || currentPage == 3) && cryptoRefreshPending) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 3 || currentPage == 4) && cryptoRefreshPending) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) {
       lastCryptoPriceRefresh = millis();
@@ -629,13 +672,26 @@ void loop() {
     }
   }
 
+  if (touchSettledForNetwork && currentPage == 2 && stockRefreshPending) {
+    set_status("Stocks updating");
+    if (queueStockPriceRefresh()) {
+      lastStockPriceRefresh = millis();
+      stockRefreshPending = false;
+    }
+  }
+
   if (touchSettledForNetwork && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
 
-  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 2 || currentPage == 3) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs()) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 3 || currentPage == 4) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs()) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
+  }
+
+  if (touchSettledForNetwork && millis() - lastStockPriceRefresh >= stockPriceRefreshIntervalMs) {
+    if (currentPage == 2) set_status("Stocks updating");
+    if (queueStockPriceRefresh()) lastStockPriceRefresh = millis();
   }
 
   if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs()) {
@@ -651,11 +707,11 @@ void loop() {
     drawCryptoSparklines();
   }
 
-  if (pairTradingDirty && currentPage == 2) {
+  if (pairTradingDirty && currentPage == 3) {
     pairTradingRender();
   }
 
-  if (tradingSignalsDirty && currentPage == 3) {
+  if (tradingSignalsDirty && currentPage == 4) {
     tradingSignalsRender();
   }
 

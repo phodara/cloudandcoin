@@ -38,10 +38,10 @@ Set it to `0` to remove the fourth `Signals` screen from the build:
 When enabled, the page flow is:
 
 ```text
-Weather -> Crypto -> Pair Trading -> Signals -> Weather
+Weather -> Crypto -> Stocks -> Pair Trading -> Signals -> Weather
 ```
 
-When disabled, the app returns to the three-screen flow.
+When disabled, the app removes the Signals page from the flow.
 
 ### Data Used
 

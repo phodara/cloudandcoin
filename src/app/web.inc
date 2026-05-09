@@ -55,7 +55,7 @@ String editorChromeStart(const char *title, const char *subtitle) {
   body += "</p>";
   if (!setupModeActive) {
     body += "<div class=\"nav\">";
-    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
+    body += "<a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/stocks\">Stocks</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a>";
     body += "</div>";
   }
   return body;
@@ -70,6 +70,8 @@ String configSummaryHtml() {
   body += configSourceLabel(deviceConfigStatus.wifiFromSd);
   body += "</p><p>Weather API key: ";
   body += configSourceLabel(deviceConfigStatus.weatherKeyFromSd);
+  body += "</p><p>Finnhub API key: ";
+  body += configSourceLabel(deviceConfigStatus.finnhubKeyFromSd);
   body += "</p><p>Weather location: ";
   body += configSourceLabel(deviceConfigStatus.weatherLocationFromSd);
   body += "</p><p>mDNS host: <code>";
@@ -153,6 +155,57 @@ void handleTickerEditorSave() {
   cryptoRefreshPending = true;
   startCryptoHistoryRefresh();
   sendTickerEditorPage("Saved. The ticker list reloaded. Prices and history will refresh in the background.", true);
+}
+
+void sendStockEditorPage(const char *message, bool success) {
+  if (!ensureWebAuthorized()) return;
+
+  bool fileOk = false;
+  String fileContent = loadTextFileFromSD(STOCK_TICKERS_PATH, fileOk);
+
+  String body = editorChromeStart("Stock Editor", "Edit /stock_tickers.txt over Wi-Fi and save directly to the SD card.");
+  appendMessage(body, message, success);
+
+  if (!fileOk) {
+    body += "<div class=\"msg err\">SD card unavailable or file could not be opened.</div>";
+    fileContent = "# Example\nAAPL\nMSFT\nNVDA\nSPY\n";
+  }
+
+  body += "<form method=\"POST\" action=\"/stocks/save\">";
+  body += "<textarea name=\"content\" spellcheck=\"false\">";
+  body += htmlEscape(fileContent);
+  body += "</textarea>";
+  body += "<br><button type=\"submit\">Save To SD Card</button></form>";
+  body += "</div></div></body></html>";
+
+  webServer.send(200, "text/html", body);
+}
+
+void handleStockEditorRoot() {
+  sendStockEditorPage("", true);
+}
+
+void handleStockEditorSave() {
+  if (!ensureWebAuthorized()) return;
+
+  if (!webServer.hasArg("content")) {
+    sendStockEditorPage("No form data was received.", false);
+    return;
+  }
+
+  String content = webServer.arg("content");
+  if (!content.endsWith("\n")) content += "\n";
+
+  if (!saveTextFileToSD(STOCK_TICKERS_PATH, content)) {
+    sendStockEditorPage("Save failed. Check the SD card and try again.", false);
+    return;
+  }
+
+  loadStockConfigurationFromSD();
+  set_status("Stocks saved");
+  renderStockWindow();
+  stockRefreshPending = true;
+  sendStockEditorPage("Saved. The stock list reloaded and quotes will refresh in the background.", true);
 }
 
 void appendTickerLookupResults(String& body, const String& query, int decimals) {
@@ -336,6 +389,7 @@ void handleSecretsEditorSave() {
   applyTimezoneConfig();
   applyScreenBrightness();
   refreshAll();
+  stockRefreshPending = true;
   set_status("Secrets saved");
   sendSecretsEditorPage("Saved. Weather settings apply immediately. Reboot to fully apply Wi-Fi or hostname changes.", true);
 }
@@ -447,7 +501,7 @@ void sendCoinGeckoTimingPage(const char *message, bool success) {
   String body = editorChromeStart("CoinGecko Timing", "Adjust how often the device calls CoinGecko for current prices and history data.");
   appendMessage(body, message, success);
   body += "<form method=\"POST\" action=\"/coingecko/save\">";
-  appendNumberInput(body, "cg_current_refresh_seconds", "Current Price Refresh", deviceConfig.cgCurrentRefreshSeconds, 30, 3600, "Seconds between current-price calls while viewing Crypto, Pair Trading, or Signals.");
+  appendNumberInput(body, "cg_current_refresh_seconds", "Current Price Refresh", deviceConfig.cgCurrentRefreshSeconds, 30, 3600, "Seconds between current-price calls while viewing Crypto, Pair Trading, or Signals. Stocks use a separate Finnhub timer.");
   appendNumberInput(body, "cg_current_retry_minutes", "Current Price Retry Delay", deviceConfig.cgCurrentRetryMinutes, 1, 1440, "Minutes to wait before retrying current prices after a rate limit.");
   appendNumberInput(body, "cg_background_refresh_minutes", "Background Price Refresh", deviceConfig.cgBackgroundRefreshMinutes, 1, 1440, "Minutes between current-price calls while the device is on Weather.");
   appendNumberInput(body, "cg_web_refresh_seconds", "Web View Price Refresh", deviceConfig.cgWebRefreshSeconds, 30, 3600, "Seconds between web-triggered current-price refresh requests.");
@@ -518,6 +572,9 @@ void sendSetupPage(const char *message, bool success) {
   body += "<label for=\"owm_api_key\">OpenWeather API Key</label><input id=\"owm_api_key\" name=\"owm_api_key\" value=\"";
   body += htmlEscape(deviceConfig.owmApiKey);
   body += "\">";
+  body += "<label for=\"finnhub_api_key\">Finnhub API Key</label><input id=\"finnhub_api_key\" name=\"finnhub_api_key\" value=\"";
+  body += htmlEscape(deviceConfig.finnhubApiKey);
+  body += "\">";
   body += "<label for=\"weather_location\">Weather Location</label><input id=\"weather_location\" name=\"weather_location\" value=\"";
   body += htmlEscape(deviceConfig.weatherLocation);
   body += "\">";
@@ -560,6 +617,7 @@ void handleSetupSave() {
   String wifiPassword = webServer.arg("wifi_password");
   String webPassword = webServer.arg("web_password");
   String owmApiKey = webServer.arg("owm_api_key");
+  String finnhubApiKey = webServer.arg("finnhub_api_key");
   String weatherLocation = webServer.arg("weather_location");
   String timezone = webServer.arg("timezone");
   String mdnsHostname = webServer.arg("mdns_hostname");
@@ -585,6 +643,7 @@ void handleSetupSave() {
   copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), wifiPassword.c_str());
   copyText(deviceConfig.webPassword, sizeof(deviceConfig.webPassword), webPassword.c_str());
   copyText(deviceConfig.owmApiKey, sizeof(deviceConfig.owmApiKey), owmApiKey.c_str(), DEFAULT_OWM_API_KEY);
+  copyText(deviceConfig.finnhubApiKey, sizeof(deviceConfig.finnhubApiKey), finnhubApiKey.c_str(), DEFAULT_FINNHUB_API_KEY);
   copyText(deviceConfig.weatherLocation, sizeof(deviceConfig.weatherLocation), weatherLocation.c_str(), DEFAULT_OWM_LOCATION);
   copyText(deviceConfig.timezone, sizeof(deviceConfig.timezone), timezone.c_str(), DEFAULT_TIMEZONE);
   copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), mdnsHostname.c_str(), DEFAULT_MDNS_HOSTNAME);
@@ -683,6 +742,34 @@ String cryptoDirectionText(float currentVal, float prevVal) {
   return "-";
 }
 
+String stockDirectionClass(float changePercent) {
+  if (isnan(changePercent)) return "flat";
+  if (changePercent > 0.0f) return "up";
+  if (changePercent < 0.0f) return "down";
+  return "flat";
+}
+
+String stockDirectionText(float changePercent) {
+  if (isnan(changePercent)) return "-";
+  if (changePercent > 0.0f) return "^";
+  if (changePercent < 0.0f) return "v";
+  return "-";
+}
+
+String formatStockPrice(float value) {
+  if (isnan(value)) return "N/A";
+  char text[24];
+  snprintf(text, sizeof(text), "$%.2f", value);
+  return String(text);
+}
+
+String formatStockPercent(float value) {
+  if (isnan(value)) return "-";
+  char text[16];
+  snprintf(text, sizeof(text), "%+.2f%%", value);
+  return String(text);
+}
+
 void handleRemoteViewRoot() {
   if (!ensureWebAuthorized()) return;
 
@@ -713,13 +800,13 @@ void handleRemoteViewRoot() {
   body += ".weather-main{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}.temp{font-size:64px;font-weight:700;line-height:.95}.cond{font-size:24px;color:#d9dde3;margin-top:8px}.badge{width:78px;height:78px;border-radius:50%;display:grid;place-items:center;background:#222b34;border:1px solid var(--line);font-weight:700;color:var(--gold)}";
   body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
   body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
-  body += ".crypto-list{display:grid;gap:8px}.coin{display:grid;grid-template-columns:60px 1fr 38px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
+  body += ".crypto-list,.stock-list{display:grid;gap:8px}.coin,.stock{display:grid;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.coin{grid-template-columns:60px 1fr 38px}.stock{grid-template-columns:60px 1fr 76px 38px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.pct{text-align:right}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
   body += ".pair-list,.signal-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair>:nth-child(n+2):nth-child(-n+4){transform:translateX(3ch)}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 92px 72px 42px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-price{text-align:right}.sig-reason{color:var(--muted);text-align:right}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
-  body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.price{font-size:18px}}";
+  body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.stock{grid-template-columns:52px 1fr 68px 30px}.price{font-size:18px}}";
   body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 88px 68px 42px}.sig-reason{grid-column:1/-1;text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
   body += "<h1>Cloud and Coin</h1><p class=\"sub\">Remote display view. Refreshes every 60 seconds.</p></div>";
-  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
+  body += "<div class=\"nav\"><a href=\"/view\">View</a><a href=\"/tickers\">Tickers</a><a href=\"/stocks\">Stocks</a><a href=\"/lookup\">Lookup</a><a href=\"/brightness\">Brightness</a><a href=\"/coingecko\">CoinGecko</a><a href=\"/secrets\">Secrets</a><a href=\"/info\">Info</a></div></div>";
 
   body += "<div class=\"status\"><div class=\"pill\"><b>Battery</b><span>";
   body += htmlEscape(formatBatteryText());
@@ -807,6 +894,31 @@ void handleRemoteViewRoot() {
     body += "\">";
     body += cryptoDirectionText(currentCryptoValues[i], previousCryptoValues[i]);
     body += "</div></div>";
+  }
+  body += "</div></section>";
+
+  body += "<section class=\"screen\"><h2>Stocks</h2><div class=\"stock-list\">";
+  if (deviceConfig.finnhubApiKey[0] == '\0') {
+    body += "<div class=\"empty\">Add <code>finnhub_api_key</code> to /secrets.txt to load stock quotes.</div>";
+  } else {
+    for (int i = 0; i < configuredStockCount; i++) {
+      String directionClass = stockDirectionClass(currentStockChangePercent[i]);
+      body += "<div class=\"stock\"><div class=\"sym\">";
+      body += htmlEscape(String(activeStocks[i].symbol));
+      body += "</div><div class=\"price ";
+      body += directionClass;
+      body += "\">";
+      body += htmlEscape(formatStockPrice(currentStockValues[i]));
+      body += "</div><div class=\"pct ";
+      body += directionClass;
+      body += "\">";
+      body += htmlEscape(formatStockPercent(currentStockChangePercent[i]));
+      body += "</div><div class=\"dir ";
+      body += directionClass;
+      body += "\">";
+      body += stockDirectionText(currentStockChangePercent[i]);
+      body += "</div></div>";
+    }
   }
   body += "</div></section>";
 
@@ -952,6 +1064,8 @@ void startWebEditor() {
     webServer.on("/", HTTP_GET, handleRemoteViewRoot);
     webServer.on("/tickers", HTTP_GET, handleTickerEditorRoot);
     webServer.on("/tickers/save", HTTP_POST, handleTickerEditorSave);
+    webServer.on("/stocks", HTTP_GET, handleStockEditorRoot);
+    webServer.on("/stocks/save", HTTP_POST, handleStockEditorSave);
     webServer.on("/lookup", HTTP_GET, handleTickerLookupRoot);
     webServer.on("/brightness", HTTP_GET, handleBrightnessRoot);
     webServer.on("/brightness/save", HTTP_POST, handleBrightnessSave);

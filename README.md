@@ -1,6 +1,6 @@
 # Cloud and Coin
 
-ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls current weather and a 4-day forecast from OpenWeather, fetches live crypto prices and history from CoinGecko, and can be viewed or configured over Wi-Fi.
+ESP32 touchscreen dashboard built with PlatformIO, LVGL, and TFT_eSPI. The display pulls current weather and a 4-day forecast from OpenWeather, fetches live crypto prices and history from CoinGecko, fetches stock quotes from Finnhub, and can be viewed or configured over Wi-Fi.
 
 For the current SD-card setup flow, see [`docs/CC_quick_install_guide.md`](docs/CC_quick_install_guide.md).
 
@@ -9,8 +9,9 @@ For the current SD-card setup flow, see [`docs/CC_quick_install_guide.md`](docs/
 - Displays a 4-day OpenWeather forecast
 - Tracks configurable cryptocurrency prices from CoinGecko
 - Draws 30-day sparkline history using CoinGecko data
-- Supports swipe navigation between weather and crypto screens
-- Provides a responsive web view for remote weather, crypto, battery, memory, and local time status
+- Tracks configurable stock quotes from Finnhub
+- Supports touch navigation between weather, crypto, stocks, pair trading, and signals screens
+- Provides a responsive web view for remote weather, crypto, stocks, battery, memory, and local time status
 - Lets you adjust screen brightness from the web UI and persist it on the SD card
 - Runs on an ESP32 with an ILI9486 TFT and XPT2046 touch controller
 
@@ -47,6 +48,7 @@ Display-related settings are defined in [`platformio.ini`](platformio.ini), so y
 ## Data Sources
 - OpenWeather for current weather and the 4-day forecast
 - CoinGecko for current crypto prices and 30-day price history
+- Finnhub for stock quotes
 
 ## Required Secrets
 Copy [`src/secrets.example.h`](src/secrets.example.h) to `src/secrets.h` and fill in:
@@ -56,6 +58,8 @@ Copy [`src/secrets.example.h`](src/secrets.example.h) to `src/secrets.h` and fil
 - `SECRET_OWM_API`
 
 `src/secrets.h` is intentionally ignored by git so credentials do not get pushed to GitHub.
+
+Runtime secrets normally live on the SD card in `/secrets.txt`. Add `finnhub_api_key=YOUR_FINNHUB_API_KEY` there to enable stock quotes.
 
 ## SD Card Crypto List
 At boot, the app tries to read `/crypto_tickers.txt` from the root of the SD card.
@@ -101,11 +105,25 @@ Display behavior:
 
 If the SD card is missing, the file is missing, or no supported tickers are found, the app falls back to its default list.
 
+## SD Card Stock List
+At boot, the app tries to read `/stock_tickers.txt` from the root of the SD card.
+
+Format:
+- One stock symbol per line
+- Blank lines are ignored
+- Lines starting with `#` are ignored
+- Optional text after `|` is ignored, so `AAPL|Apple` is accepted
+
+Example file:
+- [`sdcard/stock_tickers.txt`](sdcard/stock_tickers.txt)
+
+Stock quotes refresh about every 5 minutes and use the `finnhub_api_key` value from `/secrets.txt`. If the stock file is missing, the app falls back to `AAPL`, `MSFT`, `NVDA`, and `SPY`.
+
 ## Quick Start
 1. Install VS Code and the PlatformIO extension.
 2. Open this project folder in VS Code.
 3. Copy `src/secrets.example.h` to `src/secrets.h` and add your real credentials.
-4. Put `secrets.txt` and `crypto_tickers.txt` on the SD card, or use the temporary setup network on first boot.
+4. Put `secrets.txt`, `crypto_tickers.txt`, and optionally `stock_tickers.txt` on the SD card, or use the temporary setup network on first boot.
 5. Connect the ESP32.
 6. Build the project.
 7. Upload the firmware.

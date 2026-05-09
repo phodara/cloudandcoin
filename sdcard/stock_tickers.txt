@@ -1,0 +1,8 @@
+# Cloud and Coin stock ticker list
+# Copy this file to /stock_tickers.txt on the SD card.
+# One symbol per line. Blank lines and # comments are ignored.
+
+AAPL
+MSFT
+NVDA
+SPY

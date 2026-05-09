@@ -200,6 +200,14 @@ bool cryptoAutoScrollEnabled() {
   return configuredCryptoCount > CRYPTO_VISIBLE_ROWS;
 }
 
+int stockVisibleRowCount() {
+  return (configuredStockCount < STOCK_VISIBLE_ROWS) ? configuredStockCount : STOCK_VISIBLE_ROWS;
+}
+
+bool stockAutoScrollEnabled() {
+  return configuredStockCount > STOCK_VISIBLE_ROWS;
+}
+
 int cryptoMaxScrollOffset() {
   int maxOffset = configuredCryptoCount - CRYPTO_VISIBLE_ROWS;
   return (maxOffset > 0) ? maxOffset : 0;
@@ -208,6 +216,16 @@ int cryptoMaxScrollOffset() {
 int cryptoActiveIndexForSlot(int slot) {
   int activeIndex = cryptoScrollOffset + slot;
   return (activeIndex >= 0 && activeIndex < configuredCryptoCount) ? activeIndex : -1;
+}
+
+int stockMaxScrollOffset() {
+  int maxOffset = configuredStockCount - STOCK_VISIBLE_ROWS;
+  return (maxOffset > 0) ? maxOffset : 0;
+}
+
+int stockActiveIndexForSlot(int slot) {
+  int activeIndex = stockScrollOffset + slot;
+  return (activeIndex >= 0 && activeIndex < configuredStockCount) ? activeIndex : -1;
 }
 
 void formatCryptoPriceText(float value, int decimals, char *out, size_t outSize) {
@@ -325,6 +343,9 @@ String buildSecretsFileFromConfig() {
   content += "owm_api_key=";
   content += deviceConfig.owmApiKey;
   content += "\n";
+  content += "finnhub_api_key=";
+  content += deviceConfig.finnhubApiKey;
+  content += "\n";
   content += "weather_location=";
   content += deviceConfig.weatherLocation;
   content += "\n";
@@ -372,6 +393,7 @@ void resetDeviceConfigDefaults() {
   copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), DEFAULT_WIFI_PASS);
   copyText(deviceConfig.webPassword, sizeof(deviceConfig.webPassword), DEFAULT_WEB_PASSWORD);
   copyText(deviceConfig.owmApiKey, sizeof(deviceConfig.owmApiKey), DEFAULT_OWM_API_KEY);
+  copyText(deviceConfig.finnhubApiKey, sizeof(deviceConfig.finnhubApiKey), DEFAULT_FINNHUB_API_KEY);
   copyText(deviceConfig.weatherLocation, sizeof(deviceConfig.weatherLocation), DEFAULT_OWM_LOCATION);
   copyText(deviceConfig.timezone, sizeof(deviceConfig.timezone), DEFAULT_TIMEZONE);
   copyText(deviceConfig.mdnsHostname, sizeof(deviceConfig.mdnsHostname), DEFAULT_MDNS_HOSTNAME);
@@ -389,6 +411,7 @@ void resetDeviceConfigDefaults() {
   deviceConfigStatus.loadedFromSd = false;
   deviceConfigStatus.wifiFromSd = false;
   deviceConfigStatus.weatherKeyFromSd = false;
+  deviceConfigStatus.finnhubKeyFromSd = false;
   deviceConfigStatus.weatherLocationFromSd = false;
   deviceConfigStatus.timezoneFromSd = false;
   deviceConfigStatus.mdnsHostnameFromSd = false;
@@ -410,6 +433,9 @@ void applyDeviceConfigValue(const char *key, const char *value) {
   } else if (strcmp(key, "owm_api_key") == 0) {
     copyText(deviceConfig.owmApiKey, sizeof(deviceConfig.owmApiKey), value);
     deviceConfigStatus.weatherKeyFromSd = true;
+  } else if (strcmp(key, "finnhub_api_key") == 0 || strcmp(key, "finnhub_token") == 0) {
+    copyText(deviceConfig.finnhubApiKey, sizeof(deviceConfig.finnhubApiKey), value);
+    deviceConfigStatus.finnhubKeyFromSd = true;
   } else if (strcmp(key, "weather_location") == 0) {
     copyText(deviceConfig.weatherLocation, sizeof(deviceConfig.weatherLocation), value);
     deviceConfigStatus.weatherLocationFromSd = true;
@@ -600,10 +626,11 @@ void loadDeviceConfigurationFromSD() {
   }
 
   Serial.printf(
-    "Secrets: source=%s wifi=%s weather_key=%s location=%s timezone=%s host=%s\n",
+    "Secrets: source=%s wifi=%s weather_key=%s finnhub_key=%s location=%s timezone=%s host=%s\n",
     deviceConfigStatus.loadedFromSd ? "sd" : "defaults",
     deviceConfigStatus.wifiFromSd ? "sd" : "defaults",
     deviceConfigStatus.weatherKeyFromSd ? "sd" : "defaults",
+    deviceConfigStatus.finnhubKeyFromSd ? "sd" : "defaults",
     deviceConfigStatus.weatherLocationFromSd ? "sd" : "defaults",
     deviceConfigStatus.timezoneFromSd ? "sd" : "defaults",
     deviceConfigStatus.mdnsHostnameFromSd ? "sd" : "defaults"

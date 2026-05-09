@@ -7,6 +7,8 @@ void showPage(int page) {
     lv_obj_clear_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
@@ -20,6 +22,8 @@ void showPage(int page) {
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
@@ -36,12 +40,33 @@ void showPage(int page) {
     else cryptoHistoryRefreshPending = false;
     cryptoSparklinesDirty = true;
   } else if (currentPage == 2) {
+    lv_obj_clear_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
+    lv_obj_invalidate(stock_page);
+    stockScrollOffset = 0;
+    lastStockScrollMs = millis();
+    renderStockWindow();
+    set_status("Stocks updating");
+    stockRefreshPending = true;
+  } else if (currentPage == 3) {
     lv_obj_clear_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
     lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
@@ -58,6 +83,8 @@ void showPage(int page) {
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(signal_page);
@@ -78,8 +105,9 @@ void showNextPageFromTouch() {
   lastTouchInteractionMs = millis();
   if (currentPage == 0) showPage(1);
   else if (currentPage == 1) showPage(2);
-#if ENABLE_TRADING_SIGNALS
   else if (currentPage == 2) showPage(3);
+#if ENABLE_TRADING_SIGNALS
+  else if (currentPage == 3) showPage(4);
 #endif
   else showPage(0);
 }
@@ -333,6 +361,76 @@ void updateCrypto() {
   renderCryptoWindow();
 }
 
+// ---------------- Stock current price ----------------
+void updateStockPrice(lv_obj_t *label, const char *sym, float currentVal, float prevVal, float changePercent) {
+  if (!label) return;
+
+  if (isnan(currentVal)) {
+    char txt[24];
+    snprintf(txt, sizeof(txt), "%s  N/A", sym);
+    lv_label_set_text(label, txt);
+    lv_obj_set_style_text_color(label, lv_color_hex(0xAAAAAA), 0);
+    return;
+  }
+
+  const char *arrow = "-";
+  uint32_t colorHex = 0xFFFFFF;
+
+  if (!isnan(changePercent)) {
+    if (changePercent > 0.0f) {
+      colorHex = 0x00FF00;
+      arrow = "^";
+    } else if (changePercent < 0.0f) {
+      colorHex = 0xFF0000;
+      arrow = "v";
+    }
+  } else if (!isnan(prevVal)) {
+    if (currentVal > prevVal) {
+      colorHex = 0x00FF00;
+      arrow = "^";
+    } else if (currentVal < prevVal) {
+      colorHex = 0xFF0000;
+      arrow = "v";
+    }
+  }
+
+  char txt[56];
+  if (!isnan(changePercent)) {
+    snprintf(txt, sizeof(txt), "%s  $%.2f  %+.2f%% %s", sym, currentVal, changePercent, arrow);
+  } else {
+    snprintf(txt, sizeof(txt), "%s  $%.2f  %s", sym, currentVal, arrow);
+  }
+  lv_label_set_text(label, txt);
+  lv_obj_set_style_text_color(label, lv_color_hex(colorHex), 0);
+}
+
+void renderStockWindow() {
+  lv_label_set_text(stock_title_label, "Stocks");
+  lv_obj_set_style_text_color(stock_title_label, lv_color_hex(0xAAAAAA), 0);
+
+  for (int slot = 0; slot < STOCK_VISIBLE_ROWS; slot++) {
+    lv_obj_t *label = stock_value_labels[slot];
+    int activeIndex = stockActiveIndexForSlot(slot);
+
+    if (activeIndex < 0) {
+      if (label) {
+        lv_label_set_text(label, "");
+        lv_obj_add_flag(label, LV_OBJ_FLAG_HIDDEN);
+      }
+      continue;
+    }
+
+    if (label) lv_obj_clear_flag(label, LV_OBJ_FLAG_HIDDEN);
+    updateStockPrice(
+      label,
+      activeStocks[activeIndex].symbol,
+      currentStockValues[activeIndex],
+      previousStockValues[activeIndex],
+      currentStockChangePercent[activeIndex]
+    );
+  }
+}
+
 // ---------------- Background data worker ----------------
 void dataWorkerTask(void *param) {
   (void)param;
@@ -367,6 +465,26 @@ void dataWorkerTask(void *param) {
         for (int i = 0; i < HISTORY_POINTS; i++) stagedCryptoHistory[i] = history[i];
         cryptoHistoryResultOk = ok;
         cryptoHistoryResultReady = true;
+        xSemaphoreGive(dataWorkerMutex);
+      }
+    } else if (job.type == DATA_JOB_STOCK_PRICES) {
+      float latestValues[MAX_ACTIVE_STOCK_COUNT];
+      float latestChange[MAX_ACTIVE_STOCK_COUNT];
+      float latestChangePercent[MAX_ACTIVE_STOCK_COUNT];
+      bool ok = fetchCurrentStockQuotes(latestValues, latestChange, latestChangePercent, job.count);
+
+      if (xSemaphoreTake(dataWorkerMutex, portMAX_DELAY) == pdTRUE) {
+        int count = job.count;
+        if (count < 0) count = 0;
+        if (count > MAX_ACTIVE_STOCK_COUNT) count = MAX_ACTIVE_STOCK_COUNT;
+        stagedStockPriceCount = count;
+        for (int i = 0; i < count; i++) {
+          stagedStockValues[i] = latestValues[i];
+          stagedStockChange[i] = latestChange[i];
+          stagedStockChangePercent[i] = latestChangePercent[i];
+        }
+        stockPriceResultOk = ok;
+        stockPriceResultReady = true;
         xSemaphoreGive(dataWorkerMutex);
       }
     }
@@ -445,12 +563,34 @@ bool queueCryptoHistoryRefresh(int index) {
   return false;
 }
 
+bool queueStockPriceRefresh() {
+  if (!dataJobQueue || !dataWorkerMutex) return false;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
+  bool alreadyBusy = stockPriceJobQueued || stockPriceResultReady;
+  if (!alreadyBusy) stockPriceJobQueued = true;
+  xSemaphoreGive(dataWorkerMutex);
+  if (alreadyBusy) return true;
+
+  DataJob job = {};
+  job.type = DATA_JOB_STOCK_PRICES;
+  job.count = configuredStockCount;
+  if (xQueueSend(dataJobQueue, &job, 0) == pdTRUE) return true;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    stockPriceJobQueued = false;
+    xSemaphoreGive(dataWorkerMutex);
+  }
+  return false;
+}
+
 bool dataWorkerBusy() {
   if (!dataWorkerMutex) return false;
   bool busy = false;
   if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
     busy = cryptoPriceJobQueued || cryptoPriceResultReady ||
-           cryptoHistoryJobQueued || cryptoHistoryResultReady;
+           cryptoHistoryJobQueued || cryptoHistoryResultReady ||
+           stockPriceJobQueued || stockPriceResultReady;
     xSemaphoreGive(dataWorkerMutex);
   }
   return busy;
@@ -492,6 +632,12 @@ void applyDataWorkerResults() {
   bool historyOk = false;
   int historyIndex = -1;
   float historyValues[HISTORY_POINTS];
+  bool haveStocks = false;
+  bool stocksOk = false;
+  int stockCount = 0;
+  float stockValues[MAX_ACTIVE_STOCK_COUNT];
+  float stockChange[MAX_ACTIVE_STOCK_COUNT];
+  float stockChangePercent[MAX_ACTIVE_STOCK_COUNT];
 
   if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
 
@@ -515,6 +661,20 @@ void applyDataWorkerResults() {
     cryptoHistoryJobQueued = false;
   }
 
+  if (stockPriceResultReady) {
+    haveStocks = true;
+    stocksOk = stockPriceResultOk;
+    stockCount = stagedStockPriceCount;
+    if (stockCount > MAX_ACTIVE_STOCK_COUNT) stockCount = MAX_ACTIVE_STOCK_COUNT;
+    for (int i = 0; i < stockCount; i++) {
+      stockValues[i] = stagedStockValues[i];
+      stockChange[i] = stagedStockChange[i];
+      stockChangePercent[i] = stagedStockChangePercent[i];
+    }
+    stockPriceResultReady = false;
+    stockPriceJobQueued = false;
+  }
+
   xSemaphoreGive(dataWorkerMutex);
 
   if (havePrice) {
@@ -529,8 +689,8 @@ void applyDataWorkerResults() {
     renderCryptoWindow();
     pairTradingDirty = true;
     tradingSignalsDirty = true;
-    if (currentPage == 2) pairTradingRender();
-    if (currentPage == 3) tradingSignalsRender();
+    if (currentPage == 3) pairTradingRender();
+    if (currentPage == 4) tradingSignalsRender();
     if (priceOk) {
       nextCryptoCurrentRetryMs = 0;
       set_status("Updated");
@@ -559,6 +719,24 @@ void applyDataWorkerResults() {
     renderCryptoWindow();
     finishCryptoHistoryStep();
   }
+
+  if (haveStocks) {
+    bool hasDisplayedPrice = false;
+    for (int i = 0; i < stockCount; i++) {
+      if (!isnan(stockValues[i])) {
+        previousStockValues[i] = currentStockValues[i];
+        currentStockValues[i] = stockValues[i];
+        currentStockChange[i] = stockChange[i];
+        currentStockChangePercent[i] = stockChangePercent[i];
+      }
+      if (!isnan(currentStockValues[i])) hasDisplayedPrice = true;
+    }
+    renderStockWindow();
+    if (stocksOk) set_status("Updated");
+    else if (deviceConfig.finnhubApiKey[0] == '\0') set_status("Stocks no key");
+    else if (hasDisplayedPrice) set_status("Cached stocks");
+    else set_status("No stocks");
+  }
 }
 
 void updateCryptoAutoScroll() {
@@ -572,6 +750,19 @@ void updateCryptoAutoScroll() {
   else cryptoScrollOffset = 0;
 
   renderCryptoWindow();
+}
+
+void updateStockAutoScroll() {
+  if (currentPage != 2 || !stockAutoScrollEnabled()) return;
+
+  unsigned long now = millis();
+  if (now - lastStockScrollMs < STOCK_SCROLL_INTERVAL_MS) return;
+  lastStockScrollMs = now;
+
+  if (stockScrollOffset < stockMaxScrollOffset()) stockScrollOffset++;
+  else stockScrollOffset = 0;
+
+  renderStockWindow();
 }
 
 // ---------------- Sparkline drawing ----------------
@@ -863,12 +1054,14 @@ void showSetupInstructions() {
   lv_obj_clear_flag(setup_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
 #endif
   lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);

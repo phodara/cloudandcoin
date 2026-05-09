@@ -10,6 +10,7 @@ This guide covers the fastest way to get `Cloud and Coin` running with the new S
 - A microSD card
 - Your Wi-Fi network name and password
 - Your OpenWeather API key
+- Your Finnhub API key, optional but required for stock quotes
 
 ## SD Card Files
 
@@ -17,11 +18,13 @@ Place these files in the root of the SD card:
 
 - `secrets.txt`
 - `crypto_tickers.txt`
+- `stock_tickers.txt`, optional
 
 You can start from:
 
 - [`sdcard/secrets.example.txt`](../sdcard/secrets.example.txt)
 - [`sdcard/crypto_tickers.txt`](../sdcard/crypto_tickers.txt)
+- [`sdcard/stock_tickers.txt`](../sdcard/stock_tickers.txt)
 
 ## secrets.txt Format
 
@@ -32,6 +35,7 @@ wifi_ssid=YOUR_WIFI_SSID
 wifi_password=YOUR_WIFI_PASSWORD
 web_password=CHANGE_ME
 owm_api_key=YOUR_OPENWEATHER_API_KEY
+finnhub_api_key=YOUR_FINNHUB_API_KEY
 weather_location=Mount Kisco,US
 timezone=America/New_York
 mdns_hostname=cloudandcoin
@@ -52,10 +56,12 @@ Notes:
 - Blank lines are fine.
 - Lines starting with `#` are treated as comments.
 - `owm_api_key` must be your active OpenWeather API key.
+- `finnhub_api_key` enables the Stocks page. Leave it blank if you do not want stock quotes.
 - `weather_location` should use a city and country code such as `Mount Kisco,US`.
 - `screen_brightness` is a backlight percentage from `5` to `100`.
 - `cg_*` settings control CoinGecko refresh timing and can also be changed from the web UI.
 - See [`CC_refresh_timing_reference.md`](CC_refresh_timing_reference.md) for the full weather and crypto refresh logic.
+- Do not put API keys in the repository. Store real values only on the SD card or in ignored local files.
 
 ## crypto_tickers.txt Format
 
@@ -98,6 +104,29 @@ Display behavior:
 - `5-10` configured tickers: scrolling crypto list, sparklines disabled
 - Saving from `http://cloudandcoin.local/tickers` reloads the ticker file immediately
 
+## stock_tickers.txt Format
+
+Create `/stock_tickers.txt` in the root of the SD card.
+
+Rules:
+
+- One stock symbol per line
+- Blank lines are ignored
+- Lines starting with `#` are ignored
+- Optional text after `|` is ignored
+
+Example file:
+
+```txt
+AAPL
+MSFT
+NVDA
+SPY
+# TSLA
+```
+
+Saving from `http://cloudandcoin.local/stocks` reloads the stock ticker file immediately.
+
 ## First Boot Options
 
 You have two setup paths.
@@ -112,6 +141,7 @@ You have two setup paths.
    - `http://cloudandcoin.local/view`
    - `http://cloudandcoin.local/secrets`
    - `http://cloudandcoin.local/tickers`
+   - `http://cloudandcoin.local/stocks`
    - `http://cloudandcoin.local/info`
 
 ### Option 2: Use the Temporary Setup Network
@@ -153,6 +183,7 @@ After the device is online:
 - `http://cloudandcoin.local/` opens the live web view
 - `http://cloudandcoin.local/view` opens the live web view
 - `http://cloudandcoin.local/tickers` edits `/crypto_tickers.txt`
+- `http://cloudandcoin.local/stocks` edits `/stock_tickers.txt`
 - `http://cloudandcoin.local/lookup` searches CoinGecko and generates ticker lines
 - `http://cloudandcoin.local/brightness` changes the device screen brightness
 - `http://cloudandcoin.local/coingecko` changes CoinGecko current-price and history timing
