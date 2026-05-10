@@ -330,13 +330,26 @@ const char* timezoneToPosix(const char *timezoneName) {
 
 String buildSecretsFileFromConfig() {
   String content;
-  content.reserve(512);
+  content.reserve(1536);
   content += "wifi_ssid=";
-  content += deviceConfig.wifiSsid;
+  content += deviceConfig.savedWifiSsid[0];
   content += "\n";
   content += "wifi_password=";
-  content += deviceConfig.wifiPassword;
+  content += deviceConfig.savedWifiPassword[0];
   content += "\n";
+  for (int i = 1; i < MAX_WIFI_NETWORKS; i++) {
+    if (deviceConfig.savedWifiSsid[i][0] == '\0' && deviceConfig.savedWifiPassword[i][0] == '\0') continue;
+    content += "wifi_ssid_";
+    content += String(i + 1);
+    content += "=";
+    content += deviceConfig.savedWifiSsid[i];
+    content += "\n";
+    content += "wifi_password_";
+    content += String(i + 1);
+    content += "=";
+    content += deviceConfig.savedWifiPassword[i];
+    content += "\n";
+  }
   content += "web_password=";
   content += deviceConfig.webPassword;
   content += "\n";
@@ -382,6 +395,31 @@ String buildSecretsFileFromConfig() {
   return content;
 }
 
+void refreshSavedWifiCount() {
+  deviceConfig.savedWifiCount = 0;
+  for (int i = 0; i < MAX_WIFI_NETWORKS; i++) {
+    if (deviceConfig.savedWifiSsid[i][0] != '\0') deviceConfig.savedWifiCount++;
+  }
+}
+
+bool parseNumberedWifiKey(const char *key, const char *prefix, int &index) {
+  size_t prefixLen = strlen(prefix);
+  if (strncmp(key, prefix, prefixLen) != 0) return false;
+
+  const char *suffix = key + prefixLen;
+  if (*suffix == '\0') {
+    index = 0;
+    return true;
+  }
+
+  if (*suffix != '_') return false;
+  int number = atoi(suffix + 1);
+  if (number < 2 || number > MAX_WIFI_NETWORKS) return false;
+
+  index = number - 1;
+  return true;
+}
+
 void applyTimezoneConfig() {
   const char *posixTz = timezoneToPosix(deviceConfig.timezone);
   configTzTime(posixTz, "pool.ntp.org", "time.nist.gov");
@@ -391,6 +429,13 @@ void applyTimezoneConfig() {
 void resetDeviceConfigDefaults() {
   copyText(deviceConfig.wifiSsid, sizeof(deviceConfig.wifiSsid), DEFAULT_WIFI_SSID);
   copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), DEFAULT_WIFI_PASS);
+  for (int i = 0; i < MAX_WIFI_NETWORKS; i++) {
+    deviceConfig.savedWifiSsid[i][0] = '\0';
+    deviceConfig.savedWifiPassword[i][0] = '\0';
+  }
+  copyText(deviceConfig.savedWifiSsid[0], sizeof(deviceConfig.savedWifiSsid[0]), DEFAULT_WIFI_SSID);
+  copyText(deviceConfig.savedWifiPassword[0], sizeof(deviceConfig.savedWifiPassword[0]), DEFAULT_WIFI_PASS);
+  refreshSavedWifiCount();
   copyText(deviceConfig.webPassword, sizeof(deviceConfig.webPassword), DEFAULT_WEB_PASSWORD);
   copyText(deviceConfig.owmApiKey, sizeof(deviceConfig.owmApiKey), DEFAULT_OWM_API_KEY);
   copyText(deviceConfig.finnhubApiKey, sizeof(deviceConfig.finnhubApiKey), DEFAULT_FINNHUB_API_KEY);
@@ -422,11 +467,15 @@ void resetDeviceConfigDefaults() {
 void applyDeviceConfigValue(const char *key, const char *value) {
   if (!key || !value) return;
 
-  if (strcmp(key, "wifi_ssid") == 0) {
-    copyText(deviceConfig.wifiSsid, sizeof(deviceConfig.wifiSsid), value);
+  int wifiIndex = 0;
+  if (parseNumberedWifiKey(key, "wifi_ssid", wifiIndex)) {
+    copyText(deviceConfig.savedWifiSsid[wifiIndex], sizeof(deviceConfig.savedWifiSsid[wifiIndex]), value);
+    if (wifiIndex == 0) copyText(deviceConfig.wifiSsid, sizeof(deviceConfig.wifiSsid), value);
     deviceConfigStatus.wifiFromSd = true;
-  } else if (strcmp(key, "wifi_password") == 0) {
-    copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), value);
+    refreshSavedWifiCount();
+  } else if (parseNumberedWifiKey(key, "wifi_password", wifiIndex)) {
+    copyText(deviceConfig.savedWifiPassword[wifiIndex], sizeof(deviceConfig.savedWifiPassword[wifiIndex]), value);
+    if (wifiIndex == 0) copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), value);
     deviceConfigStatus.wifiFromSd = true;
   } else if (strcmp(key, "web_password") == 0) {
     copyText(deviceConfig.webPassword, sizeof(deviceConfig.webPassword), value);

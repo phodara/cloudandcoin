@@ -68,6 +68,10 @@ String configSummaryHtml() {
   body += deviceConfigStatus.secretsFileFound ? "Loaded from SD" : "Using compiled defaults";
   body += "</p><p>WiFi config: ";
   body += configSourceLabel(deviceConfigStatus.wifiFromSd);
+  body += " (";
+  body += String(deviceConfig.savedWifiCount);
+  body += " saved network";
+  body += deviceConfig.savedWifiCount == 1 ? ")" : "s)";
   body += "</p><p>Weather API key: ";
   body += configSourceLabel(deviceConfigStatus.weatherKeyFromSd);
   body += "</p><p>Finnhub API key: ";
@@ -561,11 +565,35 @@ void sendSetupPage(const char *message, bool success) {
 
   body += "<form method=\"POST\" action=\"/secrets/save\">";
   body += "<label for=\"wifi_ssid\">WiFi SSID</label><input id=\"wifi_ssid\" name=\"wifi_ssid\" value=\"";
-  body += htmlEscape(deviceConfig.wifiSsid);
+  body += htmlEscape(deviceConfig.savedWifiSsid[0]);
   body += "\">";
   body += "<label for=\"wifi_password\">WiFi Password</label><input id=\"wifi_password\" name=\"wifi_password\" type=\"password\" value=\"";
-  body += htmlEscape(deviceConfig.wifiPassword);
+  body += htmlEscape(deviceConfig.savedWifiPassword[0]);
   body += "\">";
+  for (int i = 1; i < MAX_WIFI_NETWORKS; i++) {
+    body += "<label for=\"wifi_ssid_";
+    body += String(i + 1);
+    body += "\">WiFi SSID ";
+    body += String(i + 1);
+    body += "</label><input id=\"wifi_ssid_";
+    body += String(i + 1);
+    body += "\" name=\"wifi_ssid_";
+    body += String(i + 1);
+    body += "\" value=\"";
+    body += htmlEscape(deviceConfig.savedWifiSsid[i]);
+    body += "\">";
+    body += "<label for=\"wifi_password_";
+    body += String(i + 1);
+    body += "\">WiFi Password ";
+    body += String(i + 1);
+    body += "</label><input id=\"wifi_password_";
+    body += String(i + 1);
+    body += "\" name=\"wifi_password_";
+    body += String(i + 1);
+    body += "\" type=\"password\" value=\"";
+    body += htmlEscape(deviceConfig.savedWifiPassword[i]);
+    body += "\">";
+  }
   body += "<label for=\"web_password\">Web Password</label><input id=\"web_password\" name=\"web_password\" type=\"password\" value=\"";
   body += htmlEscape(deviceConfig.webPassword);
   body += "\">";
@@ -641,6 +669,16 @@ void handleSetupSave() {
 
   copyText(deviceConfig.wifiSsid, sizeof(deviceConfig.wifiSsid), wifiSsid.c_str());
   copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), wifiPassword.c_str());
+  copyText(deviceConfig.savedWifiSsid[0], sizeof(deviceConfig.savedWifiSsid[0]), wifiSsid.c_str());
+  copyText(deviceConfig.savedWifiPassword[0], sizeof(deviceConfig.savedWifiPassword[0]), wifiPassword.c_str());
+  for (int i = 1; i < MAX_WIFI_NETWORKS; i++) {
+    String suffix = String(i + 1);
+    String ssidKey = "wifi_ssid_" + suffix;
+    String passwordKey = "wifi_password_" + suffix;
+    copyText(deviceConfig.savedWifiSsid[i], sizeof(deviceConfig.savedWifiSsid[i]), webServer.arg(ssidKey).c_str());
+    copyText(deviceConfig.savedWifiPassword[i], sizeof(deviceConfig.savedWifiPassword[i]), webServer.arg(passwordKey).c_str());
+  }
+  refreshSavedWifiCount();
   copyText(deviceConfig.webPassword, sizeof(deviceConfig.webPassword), webPassword.c_str());
   copyText(deviceConfig.owmApiKey, sizeof(deviceConfig.owmApiKey), owmApiKey.c_str(), DEFAULT_OWM_API_KEY);
   copyText(deviceConfig.finnhubApiKey, sizeof(deviceConfig.finnhubApiKey), finnhubApiKey.c_str(), DEFAULT_FINNHUB_API_KEY);

@@ -123,7 +123,7 @@ Stock quotes refresh about every 5 minutes and use the `finnhub_api_key` value f
 1. Install VS Code and the PlatformIO extension.
 2. Open this project folder in VS Code.
 3. Copy `src/secrets.example.h` to `src/secrets.h` and add your real credentials.
-4. Put `secrets.txt`, `crypto_tickers.txt`, and optionally `stock_tickers.txt` on the SD card, or use the temporary setup network on first boot.
+4. Put `secrets.txt`, `crypto_tickers.txt`, and optionally `stock_tickers.txt` on the SD card, or use the temporary setup network on first boot. `secrets.txt` can include up to 10 saved Wi-Fi networks with `wifi_ssid`, `wifi_ssid_2`, and so on through `wifi_ssid_10`.
 5. Connect the ESP32.
 6. Build the project.
 7. Upload the firmware.

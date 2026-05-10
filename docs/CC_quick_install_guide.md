@@ -33,6 +33,11 @@ Create `/secrets.txt` on the SD card with plain `key=value` lines and no quotes:
 ```txt
 wifi_ssid=YOUR_WIFI_SSID
 wifi_password=YOUR_WIFI_PASSWORD
+wifi_ssid_2=
+wifi_password_2=
+wifi_ssid_3=
+wifi_password_3=
+# Continue with wifi_ssid_4/wifi_password_4 through wifi_ssid_10/wifi_password_10 if needed.
 web_password=CHANGE_ME
 owm_api_key=YOUR_OPENWEATHER_API_KEY
 finnhub_api_key=YOUR_FINNHUB_API_KEY
@@ -55,6 +60,7 @@ Notes:
 - One setting per line.
 - Blank lines are fine.
 - Lines starting with `#` are treated as comments.
+- `wifi_ssid`/`wifi_password` are the primary Wi-Fi credentials. Optional numbered pairs from `wifi_ssid_2`/`wifi_password_2` through `wifi_ssid_10`/`wifi_password_10` let the device move between saved networks; on boot it scans nearby SSIDs and connects to the first saved network it finds.
 - `owm_api_key` must be your active OpenWeather API key.
 - `finnhub_api_key` enables the Stocks page. Leave it blank if you do not want stock quotes.
 - `weather_location` should use a city and country code such as `Mount Kisco,US`.

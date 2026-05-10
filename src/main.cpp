@@ -75,6 +75,7 @@ const char* DEFAULT_WEB_PASSWORD = "";
 const char* DEFAULT_SETUP_AP_NAME = "cloudandcoin-setup";
 const char* PROJECT_REPO_URL = "https://github.com/phodara/cloudandcoin";
 const char* DEFAULT_FINNHUB_API_KEY = "";
+const int MAX_WIFI_NETWORKS = 10;
 const int DEFAULT_SCREEN_BRIGHTNESS_PERCENT = 100;
 const int DEFAULT_CG_CURRENT_REFRESH_SECONDS = 60;
 const int DEFAULT_CG_CURRENT_RETRY_MINUTES = 5;
@@ -248,6 +249,9 @@ enum PressureTrend {
 struct DeviceConfig {
   char wifiSsid[64];
   char wifiPassword[64];
+  char savedWifiSsid[MAX_WIFI_NETWORKS][64];
+  char savedWifiPassword[MAX_WIFI_NETWORKS][64];
+  int savedWifiCount;
   char webPassword[64];
   char owmApiKey[96];
   char finnhubApiKey[96];
@@ -530,15 +534,15 @@ void tradingSignalsRender();
 #include "app/runtime_ui.inc"
 #include "app/ui_build.inc"
 // ---------------- WiFi ----------------
-void connectWiFi() {
-  if (deviceConfig.wifiSsid[0] == '\0') {
-    Serial.println("WiFi: SSID missing, entering setup mode");
-    startSetupAccessPoint();
-    return;
-  }
+bool tryConnectConfiguredWifi(int wifiIndex) {
+  if (wifiIndex < 0 || wifiIndex >= MAX_WIFI_NETWORKS) return false;
+  if (deviceConfig.savedWifiSsid[wifiIndex][0] == '\0') return false;
+
+  copyText(deviceConfig.wifiSsid, sizeof(deviceConfig.wifiSsid), deviceConfig.savedWifiSsid[wifiIndex]);
+  copyText(deviceConfig.wifiPassword, sizeof(deviceConfig.wifiPassword), deviceConfig.savedWifiPassword[wifiIndex]);
 
   set_status("Connecting WiFi...");
-  WiFi.mode(WIFI_STA);
+  Serial.printf("WiFi: trying configured network %d, SSID=%s\n", wifiIndex + 1, deviceConfig.wifiSsid);
   WiFi.begin(deviceConfig.wifiSsid, deviceConfig.wifiPassword);
 
   unsigned long start = millis();
@@ -546,12 +550,60 @@ void connectWiFi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     set_status(deviceConfigStatus.wifiFromSd ? "WiFi SD config" : "WiFi defaults");
-    Serial.printf("WiFi: connected, IP=%s\n", WiFi.localIP().toString().c_str());
-  } else {
-    set_status("WiFi failed");
-    Serial.println("WiFi: connection failed, entering setup mode");
-    startSetupAccessPoint();
+    Serial.printf("WiFi: connected to %s, IP=%s\n", deviceConfig.wifiSsid, WiFi.localIP().toString().c_str());
+    return true;
   }
+
+  Serial.printf("WiFi: failed to connect to %s\n", deviceConfig.wifiSsid);
+  WiFi.disconnect(false, false);
+  delay(200);
+  return false;
+}
+
+void connectWiFi() {
+  if (deviceConfig.savedWifiCount == 0) {
+    Serial.println("WiFi: SSID missing, entering setup mode");
+    startSetupAccessPoint();
+    return;
+  }
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(false, false);
+  delay(100);
+
+  set_status("Scanning WiFi...");
+  int networkCount = WiFi.scanNetworks(false, true);
+  bool attempted[MAX_WIFI_NETWORKS] = { false };
+
+  if (networkCount > 0) {
+    Serial.printf("WiFi: scan found %d networks\n", networkCount);
+    for (int found = 0; found < networkCount; found++) {
+      String foundSsid = WiFi.SSID(found);
+      for (int saved = 0; saved < MAX_WIFI_NETWORKS; saved++) {
+        if (attempted[saved] || deviceConfig.savedWifiSsid[saved][0] == '\0') continue;
+        if (foundSsid == deviceConfig.savedWifiSsid[saved]) {
+          attempted[saved] = true;
+          if (tryConnectConfiguredWifi(saved)) {
+            WiFi.scanDelete();
+            return;
+          }
+        }
+      }
+    }
+  } else {
+    Serial.printf("WiFi: scan found no networks, result=%d\n", networkCount);
+  }
+
+  WiFi.scanDelete();
+
+  for (int saved = 0; saved < MAX_WIFI_NETWORKS; saved++) {
+    if (attempted[saved] || deviceConfig.savedWifiSsid[saved][0] == '\0') continue;
+    if (tryConnectConfiguredWifi(saved)) return;
+  }
+
+  set_status("WiFi failed");
+  Serial.println("WiFi: all configured networks failed, entering setup mode");
+  startSetupAccessPoint();
 }
 
 // ---------------- Setup ----------------

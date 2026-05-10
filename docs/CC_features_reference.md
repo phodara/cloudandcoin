@@ -12,6 +12,7 @@
 - Local web editor for settings and ticker management
 - Web-controlled screen brightness saved on the SD card
 - SD-card-based runtime configuration
+- Up to 10 saved Wi-Fi networks with boot-time network scanning
 - Temporary remote configuration network for first-time Wi-Fi setup and recovery
 
 ## Weather Screen
