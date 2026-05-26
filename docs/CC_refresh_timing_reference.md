@@ -1,6 +1,6 @@
-# Weather, Crypto, and Stock Refresh Timing
+# Weather, Crypto, Stock, and News Refresh Timing
 
-This document explains when the firmware calls OpenWeather, CoinGecko, and Finnhub, which settings control those calls, and how rate-limit backoff works.
+This document explains when the firmware calls OpenWeather, CoinGecko, Finnhub, and the news RSS feed, which settings control those calls, and how rate-limit backoff works.
 
 ## Weather Timing
 
@@ -22,6 +22,10 @@ Stock quote timing is currently fixed in firmware:
 | Stock quotes | 5 minutes | Runs when Wi-Fi is connected and `finnhub_api_key` is present in `/secrets.txt`. |
 
 Quotes are fetched one configured symbol at a time from `/stock_tickers.txt`. The Stocks page keeps the last good quote on screen if a later refresh fails. If no Finnhub key is configured, the page shows unavailable values and the status line reports that the stock key is missing.
+
+## News Timing
+
+BBC World RSS headlines refresh every 45 minutes when Wi-Fi is connected. The News screen keeps the last good headlines and one-line summaries on screen if a later refresh fails, and slowly pages through cached items every 1 minute.
 
 ## CoinGecko Timing Settings
 

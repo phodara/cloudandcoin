@@ -9,6 +9,7 @@
 - 4-day OpenWeather forecast
 - Current crypto prices from CoinGecko
 - Current stock quotes from Finnhub
+- BBC World news headlines and summaries
 - On-device system status screen
 - Local web editor for settings and ticker management
 - Web-controlled screen brightness saved on the SD card
@@ -61,6 +62,13 @@
 - Firmware version
 
 Firmware versioning is controlled by `APP_VERSION` in `src/main.cpp`. The value is shown in the device header and on the System Status screen.
+
+## World News Screen
+
+- BBC World RSS headlines with one-line summaries
+- Two visible story briefs at a time
+- Slow automatic paging through cached items
+- Keeps the last good headlines on screen if a refresh fails
 
 Current crypto trade signals and pair analysis are documented in [`CC_crypto_trade_signals_reference.md`](CC_crypto_trade_signals_reference.md).
 

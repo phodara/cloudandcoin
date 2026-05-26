@@ -153,10 +153,18 @@ float prevWeatherPressure = NAN;
 const char* DEVICE_SECRETS_PATH = "/secrets.txt";
 const char* CRYPTO_TICKERS_PATH = "/crypto_tickers.txt";
 const char* STOCK_TICKERS_PATH = "/stock_tickers.txt";
+const char* NEWS_FEED_URL = "https://feeds.bbci.co.uk/news/world/rss.xml";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals, 5 = system
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals, 5 = system, 6 = news
+#if ENABLE_TRADING_SIGNALS
+const int SYSTEM_PAGE_INDEX = 5;
+const int NEWS_PAGE_INDEX = 6;
+#else
+const int SYSTEM_PAGE_INDEX = 4;
+const int NEWS_PAGE_INDEX = 5;
+#endif
 bool cryptoSparklinesDirty = true;
 bool pairTradingDirty = true;
 bool tradingSignalsDirty = true;
@@ -166,6 +174,7 @@ bool cryptoWebRefreshPending = false;
 bool cryptoHistoryRefreshPending = false;
 bool cryptoHistoryRetryMissingOnly = false;
 bool stockRefreshPending = false;
+bool newsRefreshPending = false;
 bool setupModeActive = false;
 int cryptoHistoryRefreshIndex = -1;
 unsigned long lastCryptoHistoryStepMs = 0;
@@ -178,8 +187,12 @@ const int CRYPTO_VISIBLE_ROWS = 4;
 const int STOCK_VISIBLE_ROWS = 4;
 const int PAIR_VISIBLE_ROWS = 4;
 const int SIGNAL_VISIBLE_ROWS = 4;
+const int MAX_NEWS_ITEMS = 8;
+const int NEWS_VISIBLE_ROWS = 2;
 const unsigned long CRYPTO_SCROLL_INTERVAL_MS = 2500UL;
 const unsigned long STOCK_SCROLL_INTERVAL_MS = 2500UL;
+const unsigned long NEWS_SCROLL_INTERVAL_MS = 60UL * 1000UL;
+const unsigned long NEWS_REFRESH_INTERVAL_MS = 45UL * 60UL * 1000UL;
 float cryptoHistory[MAX_ACTIVE_CRYPTO_COUNT][HISTORY_POINTS];
 bool cryptoHistoryOk[MAX_ACTIVE_CRYPTO_COUNT];
 float currentCryptoValues[MAX_ACTIVE_CRYPTO_COUNT];
@@ -195,11 +208,23 @@ int configuredStockCount = 4;
 int stockScrollOffset = 0;
 unsigned long lastStockScrollMs = 0;
 
+struct NewsItem {
+  char title[96];
+  char summary[144];
+};
+
+NewsItem currentNewsItems[MAX_NEWS_ITEMS];
+int currentNewsCount = 0;
+int newsScrollOffset = 0;
+unsigned long lastNewsScrollMs = 0;
+unsigned long lastNewsRefresh = 0;
+
 // ---------------- Background data worker ----------------
 enum DataJobType : uint8_t {
   DATA_JOB_CRYPTO_PRICES = 1,
   DATA_JOB_CRYPTO_HISTORY = 2,
-  DATA_JOB_STOCK_PRICES = 3
+  DATA_JOB_STOCK_PRICES = 3,
+  DATA_JOB_NEWS = 4
 };
 
 struct DataJob {
@@ -232,6 +257,11 @@ int stagedStockPriceCount = 0;
 float stagedStockValues[MAX_ACTIVE_STOCK_COUNT];
 float stagedStockChange[MAX_ACTIVE_STOCK_COUNT];
 float stagedStockChangePercent[MAX_ACTIVE_STOCK_COUNT];
+bool newsJobQueued = false;
+bool newsResultReady = false;
+bool newsResultOk = false;
+int stagedNewsCount = 0;
+NewsItem stagedNewsItems[MAX_NEWS_ITEMS];
 
 // ---------------- Weather / Forecast ----------------
 struct ForecastDay {
@@ -314,6 +344,7 @@ lv_obj_t *stock_page;
 lv_obj_t *pair_page;
 lv_obj_t *signal_page;
 lv_obj_t *battery_page;
+lv_obj_t *news_page;
 lv_obj_t *setup_page;
 lv_obj_t *setup_message_label;
 
@@ -322,6 +353,7 @@ lv_obj_t *stock_title_label;
 lv_obj_t *pair_title_label;
 lv_obj_t *signal_title_label;
 lv_obj_t *battery_title_label;
+lv_obj_t *news_title_label;
 lv_obj_t *weather_temp_label;
 lv_obj_t *weather_cond_label;
 lv_obj_t *weather_hi_label;
@@ -351,6 +383,9 @@ lv_obj_t *system_signal_label;
 lv_obj_t *system_sd_label;
 lv_obj_t *system_memory_label;
 lv_obj_t *system_version_label;
+lv_obj_t *news_headline_labels[NEWS_VISIBLE_ROWS];
+lv_obj_t *news_summary_labels[NEWS_VISIBLE_ROWS];
+lv_obj_t *news_status_label;
 
 // Sparkline boxes
 lv_obj_t *crypto_boxes[CRYPTO_VISIBLE_ROWS];
@@ -526,14 +561,17 @@ const char* weatherIconCode(const char *condIn);
 String formatMemoryText();
 void renderCryptoWindow();
 void renderStockWindow();
+void renderNewsWindow();
 void updateCryptoAutoScroll();
 void updateStockAutoScroll();
+void updateNewsAutoScroll();
 void startCryptoHistoryRefresh();
 void stepCryptoHistoryRefresh();
 void startDataWorker();
 bool queueCryptoPriceRefresh();
 bool queueCryptoHistoryRefresh(int index);
 bool queueStockPriceRefresh();
+bool queueNewsRefresh();
 bool dataWorkerBusy();
 void applyDataWorkerResults();
 void drawCryptoSparklines();
@@ -543,6 +581,7 @@ void tradingSignalsRender();
 #include "app/helpers.inc"
 #include "app/pair_trading.inc"
 #include "app/trading_signal.inc"
+#include "app/news_data.inc"
 #include "app/web.inc"
 #include "app/display_touch.inc"
 #include "app/crypto_data.inc"
@@ -708,6 +747,7 @@ void loop() {
   updateBatteryStatus();
   updateCryptoAutoScroll();
   updateStockAutoScroll();
+  updateNewsAutoScroll();
 #if TOUCH_DEBUG
   logTouchDebug();
 #endif
@@ -749,6 +789,11 @@ void loop() {
     }
   }
 
+  if (touchSettledForNetwork && currentPage == NEWS_PAGE_INDEX && newsRefreshPending) {
+    set_status("News updating");
+    if (queueNewsRefresh()) newsRefreshPending = false;
+  }
+
   if (touchSettledForNetwork && cryptoHistoryRefreshPending) {
     stepCryptoHistoryRefresh();
   }
@@ -761,6 +806,11 @@ void loop() {
   if (touchSettledForNetwork && millis() - lastStockPriceRefresh >= stockPriceRefreshIntervalMs) {
     if (currentPage == 2) set_status("Stocks updating");
     if (queueStockPriceRefresh()) lastStockPriceRefresh = millis();
+  }
+
+  if (touchSettledForNetwork && !newsRefreshPending && millis() - lastNewsRefresh >= NEWS_REFRESH_INTERVAL_MS) {
+    if (currentPage == NEWS_PAGE_INDEX) set_status("News updating");
+    if (queueNewsRefresh()) lastNewsRefresh = millis();
   }
 
   if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && currentPage == 0 && millis() - lastCryptoPriceRefresh >= cryptoBackgroundRefreshIntervalMs()) {

@@ -367,5 +367,46 @@ void buildUI() {
   lv_obj_set_pos(system_version_label, 230, 200);
   updateBatteryPage();
 
+  // News page
+  news_page = lv_obj_create(scr);
+  lv_obj_set_size(news_page, PAGE_W, PAGE_H);
+  lv_obj_set_pos(news_page, PAGE_X, PAGE_Y);
+  style_panel(news_page);
+
+  news_title_label = lv_label_create(scr);
+  lv_label_set_text(news_title_label, "World News");
+  lv_obj_set_style_text_font(news_title_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(news_title_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_align(news_title_label, LV_ALIGN_TOP_MID, 0, 12);
+  lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
+
+  for (int i = 0; i < NEWS_VISIBLE_ROWS; i++) {
+    int y = 18 + (i * 94);
+
+    news_headline_labels[i] = lv_label_create(news_page);
+    lv_label_set_text(news_headline_labels[i], "--");
+    lv_obj_set_width(news_headline_labels[i], PAGE_W - 24);
+    lv_label_set_long_mode(news_headline_labels[i], LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(news_headline_labels[i], &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(news_headline_labels[i], lv_color_hex(0xFFF7D6), 0);
+    lv_obj_set_pos(news_headline_labels[i], 0, y);
+
+    news_summary_labels[i] = lv_label_create(news_page);
+    lv_label_set_text(news_summary_labels[i], "");
+    lv_obj_set_width(news_summary_labels[i], PAGE_W - 24);
+    lv_label_set_long_mode(news_summary_labels[i], LV_LABEL_LONG_WRAP);
+    lv_obj_set_style_text_font(news_summary_labels[i], &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(news_summary_labels[i], lv_color_hex(0xCCCCCC), 0);
+    lv_obj_set_pos(news_summary_labels[i], 0, y + 44);
+  }
+
+  news_status_label = lv_label_create(news_page);
+  lv_label_set_text(news_status_label, "BBC World");
+  lv_obj_set_width(news_status_label, PAGE_W - 24);
+  lv_label_set_long_mode(news_status_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(news_status_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(news_status_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_set_pos(news_status_label, 0, 204);
+
   showPage(0);
 }

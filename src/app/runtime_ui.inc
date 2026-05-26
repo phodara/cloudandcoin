@@ -17,6 +17,8 @@ void showPage(int page) {
 #endif
     lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(weather_page);
     weatherBadgesDirty = true;
   } else if (currentPage == 1) {
@@ -34,6 +36,8 @@ void showPage(int page) {
 #endif
     lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(crypto_page);
     cryptoScrollOffset = 0;
     lastCryptoScrollMs = millis();
@@ -58,6 +62,8 @@ void showPage(int page) {
 #endif
     lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(stock_page);
     stockScrollOffset = 0;
     lastStockScrollMs = millis();
@@ -79,6 +85,8 @@ void showPage(int page) {
 #endif
     lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(pair_page);
     pairTradingDirty = true;
     pairTradingRender();
@@ -97,14 +105,18 @@ void showPage(int page) {
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(signal_page);
     tradingSignalsDirty = true;
     tradingSignalsRender();
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
 #endif
-  } else {
+  } else if (currentPage == SYSTEM_PAGE_INDEX) {
     lv_obj_clear_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
@@ -119,6 +131,31 @@ void showPage(int page) {
 #endif
     updateBatteryStatus(true);
     lv_obj_invalidate(battery_page);
+  } else {
+    lv_obj_clear_flag(news_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
+    newsScrollOffset = 0;
+    lastNewsScrollMs = millis();
+    renderNewsWindow();
+    if (currentNewsCount == 0) {
+      set_status("News updating");
+      newsRefreshPending = true;
+    }
+    lv_obj_invalidate(news_page);
   }
 
   lv_refr_now(nullptr);
@@ -135,9 +172,11 @@ void showNextPageFromTouch() {
   else if (currentPage == 2) showPage(3);
 #if ENABLE_TRADING_SIGNALS
   else if (currentPage == 3) showPage(4);
-  else if (currentPage == 4) showPage(5);
+  else if (currentPage == 4) showPage(SYSTEM_PAGE_INDEX);
+#else
+  else if (currentPage == 3) showPage(SYSTEM_PAGE_INDEX);
 #endif
-  else if (currentPage == 3) showPage(4);
+  else if (currentPage == SYSTEM_PAGE_INDEX) showPage(NEWS_PAGE_INDEX);
   else showPage(0);
 }
 
@@ -460,6 +499,43 @@ void renderStockWindow() {
   }
 }
 
+void renderNewsWindow() {
+  if (!news_status_label) return;
+
+  if (currentNewsCount <= 0) {
+    lv_label_set_text(news_headline_labels[0], "World news unavailable");
+    lv_label_set_text(news_summary_labels[0], WiFi.status() == WL_CONNECTED ? "Waiting for the next feed refresh." : "WiFi is disconnected.");
+    lv_obj_clear_flag(news_headline_labels[0], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(news_summary_labels[0], LV_OBJ_FLAG_HIDDEN);
+    for (int slot = 1; slot < NEWS_VISIBLE_ROWS; slot++) {
+      lv_label_set_text(news_headline_labels[slot], "");
+      lv_label_set_text(news_summary_labels[slot], "");
+      lv_obj_add_flag(news_headline_labels[slot], LV_OBJ_FLAG_HIDDEN);
+      lv_obj_add_flag(news_summary_labels[slot], LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_label_set_text(news_status_label, "BBC World");
+    return;
+  }
+
+  for (int slot = 0; slot < NEWS_VISIBLE_ROWS; slot++) {
+    int itemIndex = newsScrollOffset + slot;
+    if (itemIndex >= currentNewsCount) itemIndex -= currentNewsCount;
+
+    lv_label_set_text(news_headline_labels[slot], currentNewsItems[itemIndex].title);
+    lv_label_set_text(news_summary_labels[slot], currentNewsItems[itemIndex].summary);
+    lv_obj_clear_flag(news_headline_labels[slot], LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(news_summary_labels[slot], LV_OBJ_FLAG_HIDDEN);
+  }
+
+  char text[40];
+  int first = newsScrollOffset + 1;
+  int second = newsScrollOffset + NEWS_VISIBLE_ROWS;
+  if (second > currentNewsCount) second -= currentNewsCount;
+  if (currentNewsCount <= NEWS_VISIBLE_ROWS) snprintf(text, sizeof(text), "BBC World  %d item(s)", currentNewsCount);
+  else snprintf(text, sizeof(text), "BBC World  %d-%d/%d", first, second, currentNewsCount);
+  lv_label_set_text(news_status_label, text);
+}
+
 // ---------------- Background data worker ----------------
 void dataWorkerTask(void *param) {
   (void)param;
@@ -514,6 +590,20 @@ void dataWorkerTask(void *param) {
         }
         stockPriceResultOk = ok;
         stockPriceResultReady = true;
+        xSemaphoreGive(dataWorkerMutex);
+      }
+    } else if (job.type == DATA_JOB_NEWS) {
+      NewsItem latestNews[MAX_NEWS_ITEMS];
+      int latestNewsCount = 0;
+      bool ok = fetchWorldNews(latestNews, latestNewsCount);
+
+      if (xSemaphoreTake(dataWorkerMutex, portMAX_DELAY) == pdTRUE) {
+        if (latestNewsCount < 0) latestNewsCount = 0;
+        if (latestNewsCount > MAX_NEWS_ITEMS) latestNewsCount = MAX_NEWS_ITEMS;
+        stagedNewsCount = latestNewsCount;
+        for (int i = 0; i < latestNewsCount; i++) stagedNewsItems[i] = latestNews[i];
+        newsResultOk = ok;
+        newsResultReady = true;
         xSemaphoreGive(dataWorkerMutex);
       }
     }
@@ -613,13 +703,34 @@ bool queueStockPriceRefresh() {
   return false;
 }
 
+bool queueNewsRefresh() {
+  if (!dataJobQueue || !dataWorkerMutex) return false;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return false;
+  bool alreadyBusy = newsJobQueued || newsResultReady;
+  if (!alreadyBusy) newsJobQueued = true;
+  xSemaphoreGive(dataWorkerMutex);
+  if (alreadyBusy) return true;
+
+  DataJob job = {};
+  job.type = DATA_JOB_NEWS;
+  if (xQueueSend(dataJobQueue, &job, 0) == pdTRUE) return true;
+
+  if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+    newsJobQueued = false;
+    xSemaphoreGive(dataWorkerMutex);
+  }
+  return false;
+}
+
 bool dataWorkerBusy() {
   if (!dataWorkerMutex) return false;
   bool busy = false;
   if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
     busy = cryptoPriceJobQueued || cryptoPriceResultReady ||
            cryptoHistoryJobQueued || cryptoHistoryResultReady ||
-           stockPriceJobQueued || stockPriceResultReady;
+           stockPriceJobQueued || stockPriceResultReady ||
+           newsJobQueued || newsResultReady;
     xSemaphoreGive(dataWorkerMutex);
   }
   return busy;
@@ -667,6 +778,10 @@ void applyDataWorkerResults() {
   float stockValues[MAX_ACTIVE_STOCK_COUNT];
   float stockChange[MAX_ACTIVE_STOCK_COUNT];
   float stockChangePercent[MAX_ACTIVE_STOCK_COUNT];
+  bool haveNews = false;
+  bool newsOk = false;
+  int newsCount = 0;
+  NewsItem newsItems[MAX_NEWS_ITEMS];
 
   if (xSemaphoreTake(dataWorkerMutex, pdMS_TO_TICKS(5)) != pdTRUE) return;
 
@@ -702,6 +817,16 @@ void applyDataWorkerResults() {
     }
     stockPriceResultReady = false;
     stockPriceJobQueued = false;
+  }
+
+  if (newsResultReady) {
+    haveNews = true;
+    newsOk = newsResultOk;
+    newsCount = stagedNewsCount;
+    if (newsCount > MAX_NEWS_ITEMS) newsCount = MAX_NEWS_ITEMS;
+    for (int i = 0; i < newsCount; i++) newsItems[i] = stagedNewsItems[i];
+    newsResultReady = false;
+    newsJobQueued = false;
   }
 
   xSemaphoreGive(dataWorkerMutex);
@@ -768,6 +893,24 @@ void applyDataWorkerResults() {
     else if (hasDisplayedPrice) set_status("Cached stocks");
     else set_status("No stocks");
   }
+
+  if (haveNews) {
+    if (newsOk && newsCount > 0) {
+      currentNewsCount = newsCount;
+      for (int i = 0; i < newsCount; i++) currentNewsItems[i] = newsItems[i];
+      if (newsScrollOffset >= currentNewsCount) newsScrollOffset = 0;
+      lastNewsRefresh = millis();
+      renderNewsWindow();
+      if (currentPage == NEWS_PAGE_INDEX) set_status("Updated");
+    } else {
+      if (currentPage == NEWS_PAGE_INDEX) {
+        if (currentNewsCount > 0) set_status("Cached news");
+        else set_status("No news");
+      }
+      renderNewsWindow();
+    }
+    newsRefreshPending = false;
+  }
 }
 
 void updateCryptoAutoScroll() {
@@ -794,6 +937,19 @@ void updateStockAutoScroll() {
   else stockScrollOffset = 0;
 
   renderStockWindow();
+}
+
+void updateNewsAutoScroll() {
+  if (currentPage != NEWS_PAGE_INDEX || currentNewsCount <= NEWS_VISIBLE_ROWS) return;
+
+  unsigned long now = millis();
+  if (now - lastNewsScrollMs < NEWS_SCROLL_INTERVAL_MS) return;
+  lastNewsScrollMs = now;
+
+  if (newsScrollOffset < currentNewsCount - 1) newsScrollOffset++;
+  else newsScrollOffset = 0;
+
+  renderNewsWindow();
 }
 
 // ---------------- Sparkline drawing ----------------
@@ -1088,6 +1244,7 @@ void showSetupInstructions() {
   lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(news_page, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
 #endif
@@ -1096,6 +1253,7 @@ void showSetupInstructions() {
   lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(news_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif
