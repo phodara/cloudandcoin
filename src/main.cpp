@@ -22,7 +22,7 @@
 #include <time.h>
 #include "secrets.h"
 
-#define APP_VERSION "V11.4"
+#define APP_VERSION "V3.0"
 // Fixed four day time zone glitch
 // Used VSS Codex to optimize memory and
 
@@ -55,6 +55,7 @@
 #define BATTERY_CALIBRATION    1.0f
 #define BATTERY_MIN_V          3.20f
 #define BATTERY_MAX_V          4.20f
+#define BATTERY_CHARGE_WARNING_PERCENT 25
 #define BATTERY_SAMPLE_COUNT   8
 #define BATTERY_UPDATE_MS      10000UL
 
@@ -155,7 +156,7 @@ const char* STOCK_TICKERS_PATH = "/stock_tickers.txt";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals, 5 = system
 bool cryptoSparklinesDirty = true;
 bool pairTradingDirty = true;
 bool tradingSignalsDirty = true;
@@ -312,6 +313,7 @@ lv_obj_t *crypto_page;
 lv_obj_t *stock_page;
 lv_obj_t *pair_page;
 lv_obj_t *signal_page;
+lv_obj_t *battery_page;
 lv_obj_t *setup_page;
 lv_obj_t *setup_message_label;
 
@@ -319,6 +321,7 @@ lv_obj_t *weather_title_label;
 lv_obj_t *stock_title_label;
 lv_obj_t *pair_title_label;
 lv_obj_t *signal_title_label;
+lv_obj_t *battery_title_label;
 lv_obj_t *weather_temp_label;
 lv_obj_t *weather_cond_label;
 lv_obj_t *weather_hi_label;
@@ -334,6 +337,20 @@ lv_obj_t *crypto_value_labels[CRYPTO_VISIBLE_ROWS];
 lv_obj_t *stock_value_labels[STOCK_VISIBLE_ROWS];
 lv_obj_t *pair_value_labels[PAIR_VISIBLE_ROWS];
 lv_obj_t *signal_value_labels[SIGNAL_VISIBLE_ROWS];
+lv_obj_t *battery_percent_label;
+lv_obj_t *battery_voltage_label;
+lv_obj_t *battery_adc_label;
+lv_obj_t *battery_raw_label;
+lv_obj_t *battery_range_label;
+lv_obj_t *battery_state_label;
+lv_obj_t *battery_level_bar;
+lv_obj_t *battery_level_fill;
+lv_obj_t *system_wifi_label;
+lv_obj_t *system_ip_label;
+lv_obj_t *system_signal_label;
+lv_obj_t *system_sd_label;
+lv_obj_t *system_memory_label;
+lv_obj_t *system_version_label;
 
 // Sparkline boxes
 lv_obj_t *crypto_boxes[CRYPTO_VISIBLE_ROWS];
@@ -715,7 +732,7 @@ void loop() {
     lastWeatherRefresh = millis();
   }
 
-  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 3 || currentPage == 4) && cryptoRefreshPending) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && currentPageUsesCryptoRefresh() && cryptoRefreshPending) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) {
       lastCryptoPriceRefresh = millis();
@@ -736,7 +753,7 @@ void loop() {
     stepCryptoHistoryRefresh();
   }
 
-  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && (currentPage == 1 || currentPage == 3 || currentPage == 4) && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs()) {
+  if (touchSettledForNetwork && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive() && currentPageUsesCryptoRefresh() && millis() - lastCryptoPriceRefresh >= cryptoPriceRefreshIntervalMs()) {
     set_status("Crypto updating");
     if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
   }
@@ -763,9 +780,11 @@ void loop() {
     pairTradingRender();
   }
 
+#if ENABLE_TRADING_SIGNALS
   if (tradingSignalsDirty && currentPage == 4) {
     tradingSignalsRender();
   }
+#endif
 
   if (weatherBadgesDirty && currentPage == 0) {
     lv_refr_now(nullptr);

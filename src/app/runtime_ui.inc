@@ -15,6 +15,8 @@ void showPage(int page) {
     lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(weather_page);
     weatherBadgesDirty = true;
   } else if (currentPage == 1) {
@@ -30,6 +32,8 @@ void showPage(int page) {
     lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(crypto_page);
     cryptoScrollOffset = 0;
     lastCryptoScrollMs = millis();
@@ -52,6 +56,8 @@ void showPage(int page) {
     lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(stock_page);
     stockScrollOffset = 0;
     lastStockScrollMs = millis();
@@ -71,12 +77,14 @@ void showPage(int page) {
     lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(pair_page);
     pairTradingDirty = true;
     pairTradingRender();
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
 #if ENABLE_TRADING_SIGNALS
-  } else {
+  } else if (currentPage == 4) {
     lv_obj_clear_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
@@ -87,11 +95,30 @@ void showPage(int page) {
     lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
     lv_obj_invalidate(signal_page);
     tradingSignalsDirty = true;
     tradingSignalsRender();
     if (!allCryptoHistoryReady() && !cryptoHistoryRefreshPending) startCryptoHistoryRefresh();
 #endif
+  } else {
+    lv_obj_clear_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(weather_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+#if ENABLE_TRADING_SIGNALS
+    lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
+#endif
+    updateBatteryStatus(true);
+    lv_obj_invalidate(battery_page);
   }
 
   lv_refr_now(nullptr);
@@ -108,7 +135,9 @@ void showNextPageFromTouch() {
   else if (currentPage == 2) showPage(3);
 #if ENABLE_TRADING_SIGNALS
   else if (currentPage == 3) showPage(4);
+  else if (currentPage == 4) showPage(5);
 #endif
+  else if (currentPage == 3) showPage(4);
   else showPage(0);
 }
 
@@ -690,7 +719,9 @@ void applyDataWorkerResults() {
     pairTradingDirty = true;
     tradingSignalsDirty = true;
     if (currentPage == 3) pairTradingRender();
+#if ENABLE_TRADING_SIGNALS
     if (currentPage == 4) tradingSignalsRender();
+#endif
     if (priceOk) {
       nextCryptoCurrentRetryMs = 0;
       set_status("Updated");
@@ -1056,6 +1087,7 @@ void showSetupInstructions() {
   lv_obj_add_flag(crypto_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(stock_page, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_page, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(battery_page, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_page, LV_OBJ_FLAG_HIDDEN);
 #endif
@@ -1063,6 +1095,7 @@ void showSetupInstructions() {
   lv_obj_add_flag(crypto_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(stock_title_label, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(pair_title_label, LV_OBJ_FLAG_HIDDEN);
+  lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
 #if ENABLE_TRADING_SIGNALS
   lv_obj_add_flag(signal_title_label, LV_OBJ_FLAG_HIDDEN);
 #endif

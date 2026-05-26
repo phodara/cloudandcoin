@@ -24,7 +24,7 @@ void buildUI() {
 
   lv_obj_t *title = lv_label_create(scr);
   char titleText[24];
-  snprintf(titleText, sizeof(titleText), "Cloud and Coin v2.0");
+  snprintf(titleText, sizeof(titleText), "Cloud and Coin %s", APP_VERSION);
   lv_label_set_text(title, titleText);
   lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
   lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), 0);
@@ -246,6 +246,126 @@ void buildUI() {
     lv_obj_set_pos(signal_value_labels[i], 0, 24 + (i * 48));
   }
 #endif
+
+  // System page
+  battery_page = lv_obj_create(scr);
+  lv_obj_set_size(battery_page, PAGE_W, PAGE_H);
+  lv_obj_set_pos(battery_page, PAGE_X, PAGE_Y);
+  style_panel(battery_page);
+
+  battery_title_label = lv_label_create(scr);
+  lv_label_set_text(battery_title_label, "System");
+  lv_obj_set_style_text_font(battery_title_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_title_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_align(battery_title_label, LV_ALIGN_TOP_MID, 0, 12);
+  lv_obj_add_flag(battery_title_label, LV_OBJ_FLAG_HIDDEN);
+
+  battery_percent_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_percent_label, "--%");
+  lv_obj_set_style_text_font(battery_percent_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_percent_label, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_pos(battery_percent_label, 0, 24);
+
+  battery_state_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_state_label, batteryMonitorEnabled() ? "Reading battery..." : "Monitor disabled");
+  lv_obj_set_width(battery_state_label, PAGE_W - 24);
+  lv_label_set_long_mode(battery_state_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(battery_state_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_state_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(battery_state_label, 82, 24);
+
+  battery_level_bar = lv_obj_create(battery_page);
+  lv_obj_remove_style_all(battery_level_bar);
+  lv_obj_set_size(battery_level_bar, PAGE_W - 24, 18);
+  lv_obj_set_pos(battery_level_bar, 0, 58);
+  lv_obj_clear_flag(battery_level_bar, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_opa(battery_level_bar, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_color(battery_level_bar, lv_color_hex(0x333840), 0);
+  lv_obj_set_style_border_width(battery_level_bar, 0, 0);
+
+  battery_level_fill = lv_obj_create(battery_level_bar);
+  lv_obj_remove_style_all(battery_level_fill);
+  lv_obj_set_size(battery_level_fill, 0, 18);
+  lv_obj_set_pos(battery_level_fill, 0, 0);
+  lv_obj_clear_flag(battery_level_fill, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_bg_opa(battery_level_fill, LV_OPA_COVER, 0);
+  lv_obj_set_style_bg_color(battery_level_fill, lv_color_hex(0x7ED957), 0);
+  lv_obj_set_style_border_width(battery_level_fill, 0, 0);
+
+  battery_voltage_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_voltage_label, "Voltage: --");
+  lv_obj_set_style_text_font(battery_voltage_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_voltage_label, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_pos(battery_voltage_label, 0, 88);
+
+  battery_adc_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_adc_label, "ADC: -- mV");
+  lv_obj_set_style_text_font(battery_adc_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_adc_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(battery_adc_label, 0, 116);
+
+  battery_raw_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_raw_label, "Raw: --");
+  lv_obj_set_style_text_font(battery_raw_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_raw_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(battery_raw_label, 0, 144);
+
+  battery_range_label = lv_label_create(battery_page);
+  lv_label_set_text(battery_range_label, "Range: --");
+  lv_obj_set_width(battery_range_label, 212);
+  lv_label_set_long_mode(battery_range_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(battery_range_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(battery_range_label, lv_color_hex(0xAAAAAA), 0);
+  lv_obj_set_pos(battery_range_label, 0, 172);
+
+  system_wifi_label = lv_label_create(battery_page);
+  lv_label_set_text(system_wifi_label, "WiFi: --");
+  lv_obj_set_width(system_wifi_label, 210);
+  lv_label_set_long_mode(system_wifi_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_wifi_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_wifi_label, lv_color_hex(0xFFFFFF), 0);
+  lv_obj_set_pos(system_wifi_label, 230, 88);
+
+  system_ip_label = lv_label_create(battery_page);
+  lv_label_set_text(system_ip_label, "IP: --");
+  lv_obj_set_width(system_ip_label, 210);
+  lv_label_set_long_mode(system_ip_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_ip_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_ip_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(system_ip_label, 230, 116);
+
+  system_signal_label = lv_label_create(battery_page);
+  lv_label_set_text(system_signal_label, "Signal: --");
+  lv_obj_set_width(system_signal_label, 210);
+  lv_label_set_long_mode(system_signal_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_signal_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_signal_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(system_signal_label, 230, 144);
+
+  system_sd_label = lv_label_create(battery_page);
+  lv_label_set_text(system_sd_label, "SD: --");
+  lv_obj_set_width(system_sd_label, 210);
+  lv_label_set_long_mode(system_sd_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_sd_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_sd_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(system_sd_label, 230, 172);
+
+  system_memory_label = lv_label_create(battery_page);
+  lv_label_set_text(system_memory_label, "Mem: --");
+  lv_obj_set_width(system_memory_label, 210);
+  lv_label_set_long_mode(system_memory_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_memory_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_memory_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(system_memory_label, 0, 200);
+
+  system_version_label = lv_label_create(battery_page);
+  lv_label_set_text(system_version_label, "FW: --");
+  lv_obj_set_width(system_version_label, 210);
+  lv_label_set_long_mode(system_version_label, LV_LABEL_LONG_CLIP);
+  lv_obj_set_style_text_font(system_version_label, &lv_font_montserrat_14, 0);
+  lv_obj_set_style_text_color(system_version_label, lv_color_hex(0xCCCCCC), 0);
+  lv_obj_set_pos(system_version_label, 230, 200);
+  updateBatteryPage();
 
   showPage(0);
 }

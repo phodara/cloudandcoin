@@ -3,6 +3,14 @@ void set_status(const char *msg) {
   if (status_label) lv_label_set_text(status_label, msg);
 }
 
+bool currentPageUsesCryptoRefresh() {
+  if (currentPage == 1 || currentPage == 3) return true;
+#if ENABLE_TRADING_SIGNALS
+  if (currentPage == 4) return true;
+#endif
+  return false;
+}
+
 bool batteryMonitorEnabled() {
 #if ENABLE_BATTERY_MONITOR
   return BATTERY_ADC_PIN >= 0;
@@ -72,11 +80,95 @@ int batteryPercentFromVoltage(float voltage) {
   return 100;
 }
 
+const char *batteryStateText() {
+  if (!batteryMonitorEnabled()) return "Monitor disabled";
+  if (lastBatteryRaw < 0 || lastBatteryAdcMv < 0 || isnan(lastBatteryVoltage) || lastBatteryPercent < 0) {
+    return "Battery reading unavailable";
+  }
+  if (lastBatteryPercent <= 10) return "Low battery";
+  if (lastBatteryPercent <= BATTERY_CHARGE_WARNING_PERCENT) return "Charge soon";
+  if (lastBatteryPercent >= 95) return "Battery full";
+  return "Battery OK";
+}
+
+void updateBatteryPage() {
+  if (!battery_percent_label) return;
+
+  char text[48];
+  if (!batteryMonitorEnabled()) {
+    lv_label_set_text(battery_percent_label, "--%");
+    lv_label_set_text(battery_voltage_label, "Voltage: monitor off");
+    lv_label_set_text(battery_adc_label, "ADC: -- mV");
+    lv_label_set_text(battery_raw_label, "Raw: --");
+    lv_obj_set_width(battery_level_fill, 0);
+  } else if (lastBatteryRaw < 0 || lastBatteryAdcMv < 0 || isnan(lastBatteryVoltage) || lastBatteryPercent < 0) {
+    lv_label_set_text(battery_percent_label, "--%");
+    lv_label_set_text(battery_voltage_label, "Voltage: --");
+    lv_label_set_text(battery_adc_label, "ADC: -- mV");
+    lv_label_set_text(battery_raw_label, "Raw: --");
+    lv_obj_set_width(battery_level_fill, 0);
+  } else {
+    snprintf(text, sizeof(text), "%d%%", lastBatteryPercent);
+    lv_label_set_text(battery_percent_label, text);
+    snprintf(text, sizeof(text), "Voltage: %.2f V", lastBatteryVoltage);
+    lv_label_set_text(battery_voltage_label, text);
+    snprintf(text, sizeof(text), "ADC: %d mV", lastBatteryAdcMv);
+    lv_label_set_text(battery_adc_label, text);
+    snprintf(text, sizeof(text), "Raw: %d", lastBatteryRaw);
+    lv_label_set_text(battery_raw_label, text);
+    lv_obj_set_width(battery_level_fill, ((PAGE_W - 24) * lastBatteryPercent) / 100);
+  }
+
+  snprintf(text, sizeof(text), "Range: %.2f-%.2f V  Warn: %d%%", BATTERY_MIN_V, BATTERY_MAX_V, BATTERY_CHARGE_WARNING_PERCENT);
+  lv_label_set_text(battery_range_label, text);
+  lv_label_set_text(battery_state_label, batteryStateText());
+
+  lv_color_t stateColor = lv_color_hex(0xCCCCCC);
+  if (batteryMonitorEnabled() && lastBatteryPercent >= 0) {
+    if (lastBatteryPercent <= 10) stateColor = lv_color_hex(0xFF6B6B);
+    else if (lastBatteryPercent <= BATTERY_CHARGE_WARNING_PERCENT) stateColor = lv_color_hex(0xF4B400);
+    else stateColor = lv_color_hex(0x7ED957);
+  }
+  lv_obj_set_style_text_color(battery_state_label, stateColor, 0);
+  lv_obj_set_style_bg_color(battery_level_bar, lv_color_hex(0x333840), 0);
+  lv_obj_set_style_bg_color(battery_level_fill, stateColor, 0);
+
+  if (system_wifi_label) {
+    if (setupModeActive) {
+      lv_label_set_text(system_wifi_label, "WiFi: Setup AP");
+      snprintf(text, sizeof(text), "IP: %s", WiFi.softAPIP().toString().c_str());
+      lv_label_set_text(system_ip_label, text);
+      lv_label_set_text(system_signal_label, "Signal: AP mode");
+    } else if (WiFi.status() == WL_CONNECTED) {
+      lv_label_set_text(system_wifi_label, "WiFi: Connected");
+      snprintf(text, sizeof(text), "IP: %s", WiFi.localIP().toString().c_str());
+      lv_label_set_text(system_ip_label, text);
+      snprintf(text, sizeof(text), "Signal: %d dBm", WiFi.RSSI());
+      lv_label_set_text(system_signal_label, text);
+    } else {
+      lv_label_set_text(system_wifi_label, "WiFi: Disconnected");
+      lv_label_set_text(system_ip_label, "IP: --");
+      lv_label_set_text(system_signal_label, "Signal: --");
+    }
+
+    snprintf(text, sizeof(text), "SD: %s", sdCardReady ? "Ready" : "Unavailable");
+    lv_label_set_text(system_sd_label, text);
+
+    String memoryText = "Mem: ";
+    memoryText += formatMemoryText();
+    lv_label_set_text(system_memory_label, memoryText.c_str());
+
+    snprintf(text, sizeof(text), "FW: %s", APP_VERSION);
+    lv_label_set_text(system_version_label, text);
+  }
+}
+
 void updateBatteryStatus(bool force) {
   if (!battery_label) return;
 
   if (!batteryMonitorEnabled()) {
     lv_label_set_text(battery_label, "Batt off");
+    updateBatteryPage();
     return;
   }
 
@@ -96,6 +188,7 @@ void updateBatteryStatus(bool force) {
     snprintf(text, sizeof(text), "Batt %.2fV %d%%", lastBatteryVoltage, lastBatteryPercent);
   }
   lv_label_set_text(battery_label, text);
+  updateBatteryPage();
 
   if (memory_label) {
     String memoryText = "Mem ";

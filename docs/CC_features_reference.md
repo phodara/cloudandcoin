@@ -9,6 +9,7 @@
 - 4-day OpenWeather forecast
 - Current crypto prices from CoinGecko
 - Current stock quotes from Finnhub
+- On-device system status screen
 - Local web editor for settings and ticker management
 - Web-controlled screen brightness saved on the SD card
 - SD-card-based runtime configuration
@@ -46,6 +47,20 @@
 - `1-4` configured tickers: fixed stock layout
 - `5-10` configured tickers: scrolling stock list
 - Keeps the last good value on screen if a refresh fails
+
+## System Status Screen
+
+- Battery percentage and status
+- Estimated battery voltage
+- ADC millivolt and raw readings
+- Configured minimum and maximum voltage range
+- Configured charge warning threshold
+- Wi-Fi connection state, IP address, and signal strength
+- SD-card readiness
+- Memory/flash usage
+- Firmware version
+
+Firmware versioning is controlled by `APP_VERSION` in `src/main.cpp`. The value is shown in the device header and on the System Status screen.
 
 Current crypto trade signals and pair analysis are documented in [`CC_crypto_trade_signals_reference.md`](CC_crypto_trade_signals_reference.md).
 

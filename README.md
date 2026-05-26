@@ -10,7 +10,7 @@ For the current SD-card setup flow, see [`docs/CC_quick_install_guide.md`](docs/
 - Tracks configurable cryptocurrency prices from CoinGecko
 - Draws 30-day sparkline history using CoinGecko data
 - Tracks configurable stock quotes from Finnhub
-- Supports touch navigation between weather, crypto, stocks, pair trading, and signals screens
+- Supports touch navigation between weather, crypto, stocks, pair trading, signals, and system status screens
 - Provides a responsive web view for remote weather, crypto, stocks, battery, memory, and local time status
 - Lets you adjust screen brightness from the web UI and persist it on the SD card
 - Runs on an ESP32 with an ILI9486 TFT and XPT2046 touch controller
