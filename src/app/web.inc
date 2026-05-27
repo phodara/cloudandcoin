@@ -811,22 +811,32 @@ String formatStockPercent(float value) {
 void handleRemoteViewRoot() {
   if (!ensureWebAuthorized()) return;
 
-  bool requestCryptoRefresh = false;
+  bool requestDataRefresh = false;
   unsigned long lastAnyCryptoRefresh = lastCryptoWebRefresh > lastCryptoPriceRefresh
     ? lastCryptoWebRefresh
     : lastCryptoPriceRefresh;
-  if (WiFi.status() == WL_CONNECTED && currentPage == 0 && !cryptoHistoryRefreshPending && !cryptoWebRefreshPending &&
+  if (WiFi.status() == WL_CONNECTED && !cryptoWebRefreshPending &&
       (lastAnyCryptoRefresh == 0 || millis() - lastAnyCryptoRefresh >= cryptoWebRefreshIntervalMs())) {
     cryptoWebRefreshPending = true;
-    requestCryptoRefresh = true;
+    requestDataRefresh = true;
+  }
+  bool newsCacheEmpty = currentNewsCount == 0;
+  bool newsCacheStale = lastNewsRefresh > 0 && millis() - lastNewsRefresh >= NEWS_REFRESH_INTERVAL_MS;
+  if (WiFi.status() == WL_CONNECTED && (newsCacheEmpty || newsCacheStale) && !newsRefreshPending) {
+    if (queueNewsRefresh()) {
+      lastNewsRefresh = millis();
+      requestDataRefresh = true;
+    } else {
+      newsRefreshPending = true;
+    }
   }
 
   String body;
-  body.reserve(24000);
+  body.reserve(28000);
   body += "<!doctype html><html><head><meta charset=\"utf-8\">";
   body += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">";
   body += "<meta http-equiv=\"refresh\" content=\"";
-  body += requestCryptoRefresh ? webViewRefreshAfterCryptoRequestSeconds : webViewRefreshSeconds;
+  body += requestDataRefresh ? webViewRefreshAfterCryptoRequestSeconds : webViewRefreshSeconds;
   body += "\">";
   body += "<title>Cloud and Coin View</title><style>";
   body += ":root{color-scheme:dark;--bg:#0f1216;--panel:#191f26;--line:#2d3744;--text:#eef3f8;--muted:#a9b6c4;--gold:#f4b400;--blue:#7ec8ff;--green:#54d67b;--red:#ff6b6b;}";
@@ -839,7 +849,7 @@ void handleRemoteViewRoot() {
   body += ".metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}.metric{border-top:1px solid var(--line);padding-top:10px}.metric b{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric span{font-size:20px}.hi{color:var(--gold)}.lo{color:var(--blue)}";
   body += ".forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.day{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.day b{display:block;font-size:15px}.day .range{color:var(--gold);margin:8px 0 4px}.day .small{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}";
   body += ".crypto-list,.stock-list{display:grid;gap:8px}.coin,.stock{display:grid;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.coin{grid-template-columns:60px 1fr 38px}.stock{grid-template-columns:60px 1fr 76px 38px}.sym{font-weight:700}.price{text-align:right;font-size:20px}.pct{text-align:right}.dir{text-align:center;font-weight:700}.up{color:var(--green)}.down{color:var(--red)}.flat{color:var(--muted)}";
-  body += ".pair-list,.signal-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair>:nth-child(n+2):nth-child(-n+4){transform:translateX(3ch)}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 92px 72px 42px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-price{text-align:right}.sig-reason{color:var(--muted);text-align:right}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
+  body += ".pair-list,.signal-list,.news-list{display:grid;gap:8px}.pair{display:grid;grid-template-columns:76px 68px 56px 56px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.pair>:nth-child(n+2):nth-child(-n+4){transform:translateX(3ch)}.pair-name,.sig-symbol{font-weight:700}.pair-signal,.sig-action{font-weight:700}.pair-bias{text-align:right}.signal{display:grid;grid-template-columns:60px 92px 72px 42px 1fr;gap:10px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:11px 12px}.sig-price{text-align:right}.sig-reason{color:var(--muted);text-align:right}.news-item{border:1px solid var(--line);border-radius:8px;padding:11px 12px}.headline{font-weight:700;line-height:1.25}.summary{color:var(--muted);font-size:14px;line-height:1.35;margin-top:6px}.buy{color:var(--green)}.sell{color:var(--red)}.watch,.med{color:var(--gold)}.strong{color:var(--green)}.weak,.hold,.wait{color:var(--muted)}.empty{color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:14px}";
   body += "@media(max-width:760px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}.status{grid-template-columns:1fr}.grid{grid-template-columns:1fr}.temp{font-size:52px}.metrics{grid-template-columns:1fr 1fr}.forecast{grid-template-columns:1fr 1fr}.coin{grid-template-columns:52px 1fr 30px}.stock{grid-template-columns:52px 1fr 68px 30px}.price{font-size:18px}}";
   body += "@media(max-width:760px){.pair{grid-template-columns:1fr 64px 48px 48px}.pair-bias{grid-column:1/-1;text-align:left;color:var(--muted)}.signal{grid-template-columns:52px 88px 68px 42px}.sig-reason{grid-column:1/-1;text-align:left}}";
   body += "</style></head><body><div class=\"wrap\"><div class=\"top\"><div>";
@@ -959,6 +969,29 @@ void handleRemoteViewRoot() {
     }
   }
   body += "</div></section>";
+
+  body += "<section class=\"screen\"><h2>News</h2><div class=\"news-list\">";
+  if (currentNewsCount <= 0) {
+    body += "<div class=\"empty\">";
+    body += WiFi.status() == WL_CONNECTED ? "Headlines are loading. This page will refresh shortly." : "WiFi is disconnected, so headlines are unavailable.";
+    body += "</div>";
+  } else {
+    int visibleNews = currentNewsCount < 4 ? currentNewsCount : 4;
+    for (int i = 0; i < visibleNews; i++) {
+      body += "<div class=\"news-item\"><div class=\"headline\">";
+      body += htmlEscape(String(currentNewsItems[i].title));
+      body += "</div><div class=\"summary\">";
+      body += htmlEscape(String(currentNewsItems[i].summary));
+      body += "</div></div>";
+    }
+  }
+  body += "</div><p class=\"sub\">BBC World headlines";
+  if (currentNewsCount > 0) {
+    body += "  ";
+    body += String(currentNewsCount);
+    body += " cached";
+  }
+  body += "</p></section>";
 
   pairTradingComputeCandidates();
   body += "<section class=\"screen\"><h2>Pair Trading</h2><div class=\"pair-list\">";

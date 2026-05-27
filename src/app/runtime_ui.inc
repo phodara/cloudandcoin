@@ -172,11 +172,11 @@ void showNextPageFromTouch() {
   else if (currentPage == 2) showPage(3);
 #if ENABLE_TRADING_SIGNALS
   else if (currentPage == 3) showPage(4);
-  else if (currentPage == 4) showPage(SYSTEM_PAGE_INDEX);
+  else if (currentPage == 4) showPage(NEWS_PAGE_INDEX);
 #else
-  else if (currentPage == 3) showPage(SYSTEM_PAGE_INDEX);
+  else if (currentPage == 3) showPage(NEWS_PAGE_INDEX);
 #endif
-  else if (currentPage == SYSTEM_PAGE_INDEX) showPage(NEWS_PAGE_INDEX);
+  else if (currentPage == NEWS_PAGE_INDEX) showPage(SYSTEM_PAGE_INDEX);
   else showPage(0);
 }
 

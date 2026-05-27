@@ -157,13 +157,13 @@ const char* NEWS_FEED_URL = "https://feeds.bbci.co.uk/news/world/rss.xml";
 bool sdCardReady = false;
 
 // ---------------- Page state ----------------
-int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals, 5 = system, 6 = news
+int currentPage = 0;   // 0 = weather, 1 = crypto, 2 = stocks, 3 = pair trading, 4 = signals, 5 = news, 6 = system
 #if ENABLE_TRADING_SIGNALS
-const int SYSTEM_PAGE_INDEX = 5;
-const int NEWS_PAGE_INDEX = 6;
-#else
-const int SYSTEM_PAGE_INDEX = 4;
 const int NEWS_PAGE_INDEX = 5;
+const int SYSTEM_PAGE_INDEX = 6;
+#else
+const int NEWS_PAGE_INDEX = 4;
+const int SYSTEM_PAGE_INDEX = 5;
 #endif
 bool cryptoSparklinesDirty = true;
 bool pairTradingDirty = true;
@@ -728,12 +728,10 @@ void setup() {
     fetchForecast4();
     updateForecastLabels();
     set_status("Crypto updating");
-    queueCryptoPriceRefresh();
-    lastCryptoPriceRefresh = millis();
+    if (queueCryptoPriceRefresh()) lastCryptoPriceRefresh = millis();
     startCryptoHistoryRefresh();
     set_status("Stocks updating");
-    queueStockPriceRefresh();
-    lastStockPriceRefresh = millis();
+    if (queueStockPriceRefresh()) lastStockPriceRefresh = millis();
 
     lastWeatherRefresh = millis();
   }
@@ -758,7 +756,7 @@ void loop() {
 
   bool touchSettledForNetwork = millis() - lastTouchInteractionMs >= touchNetworkSettleMs;
 
-  if (cryptoWebRefreshPending && !cryptoHistoryRefreshPending && !cryptoCurrentBackoffActive()) {
+  if (cryptoWebRefreshPending && !cryptoCurrentBackoffActive()) {
     if (queueCryptoPriceRefresh()) {
       set_status("Crypto updating");
       lastCryptoPriceRefresh = millis();
@@ -789,9 +787,12 @@ void loop() {
     }
   }
 
-  if (touchSettledForNetwork && currentPage == NEWS_PAGE_INDEX && newsRefreshPending) {
-    set_status("News updating");
-    if (queueNewsRefresh()) newsRefreshPending = false;
+  if (touchSettledForNetwork && newsRefreshPending) {
+    if (currentPage == NEWS_PAGE_INDEX) set_status("News updating");
+    if (queueNewsRefresh()) {
+      lastNewsRefresh = millis();
+      newsRefreshPending = false;
+    }
   }
 
   if (touchSettledForNetwork && cryptoHistoryRefreshPending) {
